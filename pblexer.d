@@ -177,6 +177,9 @@ struct PBMessage {
 			case PBTypes.PB_Optional:
 				message.children ~= PBChild(type,pbstring);
 				break;
+			case PBTypes.PB_Comment:
+				stripValidChars(CClass.Comment,pbstring);
+				break;
 			default:
 				// XXX fix this message XXX
 				throw new PBParseException("Message Definition","Only extend, service, package, and message are allowed here.");
@@ -212,7 +215,8 @@ struct PBRoot {
 				root.messages ~= PBMessage(pbstring);
 				break;
 			case PBTypes.PB_Comment:
-				pbstring = stripValidChars(CClass.Comment,pbstring);
+				stripValidChars(CClass.Comment,pbstring);
+				break;
 			default:
 				throw new PBParseException("Protocol Buffer Definition Root","Only extend, service, package, and message are allowed here.");
 				break;
@@ -266,7 +270,7 @@ PBTypes typeNextElement(in char[]pbstring) {
 	// we want to check for // type comments here, since there doesn't necessarily have to be a space after the opener
 	if (pbstring.length>1 && pbstring[0..2] == "//") return PBTypes.PB_Comment;
 	int i=0;
-	for(;!iswhite(pbstring[i]) && i<pbstring.length;i++){}
+	for(;i<pbstring.length && !iswhite(pbstring[i]);i++){}
 	auto type = pbstring[0..i];
 	switch(type) {
 	case "package":
@@ -303,7 +307,7 @@ PBTypes typeNextElement(in char[]pbstring) {
 // this will rip off the next token
 char[]stripValidChars(CClass cc,inout char[]pbstring) {
 	int i=0;
-	for(;isValidChar(cc,pbstring[i]) && i<pbstring.length;i++){}
+	for(;i<pbstring.length && isValidChar(cc,pbstring[i]);i++){}
 	char[]tmp = pbstring[0..i];
 	pbstring = pbstring[i..$];
 	return tmp;
@@ -323,6 +327,8 @@ bool isValidChar(CClass cc,char pc) {
 		break;
 	case CClass.Comment:
 		if (pc == '\n') return false;
+		if (pc == '\r') return false;
+		if (pc == '\f') return false;
 		return true;
 		break;
 	default:
@@ -351,6 +357,8 @@ char[] stripLWhite(char[] s)
 unittest {
 	writefln("unittest ProtocolBuffer.pbroot");
 	char[]pbstring = "   
+// my comments hopefully won't explode anything
+//especially here    
    message Person {required string name= 1;
   required int32 id =2;
   optional string email = 3 ;
