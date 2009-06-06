@@ -95,12 +95,16 @@ struct PBEnum {
 		}
 		// rip off opening {
 		pbstring = pbstring[1..$];
-		// prep for loop spinup by removing extraneous whitespace
-		pbstring = stripLWhite(pbstring);
 		// now we're ready to enter the loop and parse children
 		while(pbstring[0] != '}') {
-			// start parsing, we shouldn't have any whitespace here
-			pbenum.grabEnumValue(pbstring);
+			pbstring = stripLWhite(pbstring);
+			if (pbstring.length>1 && pbstring[0..2] == "//") {
+				// rip out the comment...
+				stripValidChars(CClass.Comment,pbstring);
+			} else {
+				// start parsing, we shouldn't have any whitespace here
+				pbenum.grabEnumValue(pbstring);
+			}
 		}
 		// rip off the }
 		pbstring = pbstring[1..$];
@@ -126,7 +130,6 @@ struct PBEnum {
 		// make sure we snatch a semicolon
 		if (pbstring[0] != ';') throw new PBParseException("Enum Definition("~name~"."~tmp~"="~num~")","Expected ';'.");
 		pbstring = pbstring[1..$];
-		pbstring = stripLWhite(pbstring);
 	}
 }
 
@@ -358,22 +361,25 @@ unittest {
 	writefln("unittest ProtocolBuffer.pbroot");
 	char[]pbstring = "   
 // my comments hopefully won't explode anything
-//especially here    
    message Person {required string name= 1;
   required int32 id =2;
   optional string email = 3 ;
 
   enum PhoneType{
     MOBILE= 0;HOME =1;
+    // gotta make sure comments work everywhere
     WORK=2 ;}
 
   message PhoneNumber {
     required string number = 1;
+    //woah, comments in a sub-definition  
     optional PhoneType type = 2 ;
   }
 
   repeated PhoneNumber phone = 4;
-}";
+}
+//especially here    
+";
 	auto root = PBRoot(pbstring);
 	return 0;
 }
