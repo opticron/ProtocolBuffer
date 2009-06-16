@@ -31,33 +31,6 @@ enum CClass {
 	Comment,
 }
 
-char[]toDType(char[]intype) {
-	// XXX fix types here XXX
-	char[]retstr;
-	switch(intype) {
-	case "sint32","sfixed32","int32":
-		retstr = "int";
-		break;
-	case "sint64","sfixed64","int64":
-		retstr = "long";
-		break;
-	case "fixed32","uint32":
-		retstr = "uint";
-		break;
-	case "fixed64","uint64":
-		retstr = "ulong";
-		break;
-	case "string","bytes":
-		retstr = "char[]";
-		break;
-	default:
-		// this takes care of float, double, and bool as well
-		retstr = intype;
-		break;
-	}
-	return retstr;
-}
-
 bool validateMultiIdentifier(char[]ident)
 in {
 	assert(ident.length);

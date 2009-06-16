@@ -84,7 +84,7 @@ struct PBMessage {
 			case PBTypes.PB_Repeated:
 			case PBTypes.PB_Required:
 			case PBTypes.PB_Optional:
-				message.children ~= PBChild(type,pbstring);
+				message.children ~= PBChild(pbstring);
 				break;
 			case PBTypes.PB_Comment:
 				stripValidChars(CClass.Comment,pbstring);

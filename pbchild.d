@@ -19,7 +19,7 @@ struct PBChild {
 		return indent~toDType(type)~" "~name~";\n";
 	}
 
-	static PBChild opCall(PBTypes type,inout char[]pbstring)
+	static PBChild opCall(inout char[]pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
@@ -63,10 +63,43 @@ struct PBChild {
 	}
 }
 
+char[]toDType(char[]intype) {
+        // XXX fix types here XXX
+        char[]retstr;
+        switch(intype) {
+        case "sint32","sfixed32","int32":
+                retstr = "int";
+                break;
+        case "sint64","sfixed64","int64":
+                retstr = "long";
+                break;
+        case "fixed32","uint32":
+                retstr = "uint";
+                break;
+        case "fixed64","uint64":
+                retstr = "ulong";
+                break;
+        case "string","bytes":
+                retstr = "char[]";
+                break;
+        default:
+                // this takes care of float, double, and bool as well
+                retstr = intype;
+                break;
+        }
+        return retstr;
+}
 
 unittest {
 	// XXX write unit tests for this XXX
 	writefln("unittest ProtocolBuffer.pbchild");
+	char[]childtxt = "  \n  optional int32 i32test = 1;";
+	auto child = PBChild(childtxt);
+	assert(child.type == "int32");
+	assert(child.name == "i32test");
+	assert(child.index == 1);
+	assert(child.modifier == "optional");
+	assert(child.toDString("	") == "	int i32test;");
 	return 0;
 }
 
