@@ -91,7 +91,6 @@ char[]toDType(char[]intype) {
 }
 
 unittest {
-	// XXX write unit tests for this XXX
 	writefln("unittest ProtocolBuffer.pbchild");
 	// assumes leading whitespace has already been stripped
 	char[]childtxt = "optional int32 i32test = 1;";

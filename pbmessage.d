@@ -104,8 +104,15 @@ struct PBMessage {
 }
 
 unittest {
-	// XXX write unit tests for this
+	char[]instring = "message glorm{\noptional int32 i32test = 1;\nmessage simple { }\noptional simple quack = 5;\n}\n";
+	char[]compstr = "class glorm {\n	class simple {\n	}\n	int i32test;\n	simple quack;\n}\n";
 	writefln("unittest ProtocolBuffer.pbroot");
+	auto msg = PBMessage(instring);
+	debug {
+		writefln("Correct output:\n%s",compstr);
+		writefln("Generated output:\n%s",msg.toDString(""));
+	}
+	assert(msg.toDString("") == compstr);
 	return 0;
 }
 

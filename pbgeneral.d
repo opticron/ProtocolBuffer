@@ -155,8 +155,20 @@ in {
 }
 
 unittest {
-	// XXX make unit tests for this XXX
 	writefln("unittest ProtocolBuffer.pbgeneral");
+	writefln("Checking stripLWhite...");
+	assert("asdf " == stripLWhite("  \n	asdf "));
+	writefln("Checking validIdentifier...");
+	assert(validIdentifier("asdf"));
+	assert(!validIdentifier("8asdf"));
+	writefln("Checking stripValidChars...");
+	char[]tmp = "asdf1 yarrr";
+	assert(stripValidChars(CClass.Identifier,tmp) == "asdf1");
+	assert(tmp == " yarrr");
+	tmp = "as2f.ya7rr -adfbads25737";
+	assert(stripValidChars(CClass.MultiIdentifier,tmp) == "as2f.ya7rr");
+	assert(tmp == " -adfbads25737");
+	// XXX these need to be finished up for all functions XXX
 	return 0;
 }
 
