@@ -93,13 +93,20 @@ char[]toDType(char[]intype) {
 unittest {
 	// XXX write unit tests for this XXX
 	writefln("unittest ProtocolBuffer.pbchild");
-	char[]childtxt = "  \n  optional int32 i32test = 1;";
+	// assumes leading whitespace has already been stripped
+	char[]childtxt = "optional int32 i32test = 1;";
 	auto child = PBChild(childtxt);
-	assert(child.type == "int32");
-	assert(child.name == "i32test");
-	assert(child.index == 1);
+	writefln("Checking modifier...");
 	assert(child.modifier == "optional");
-	assert(child.toDString("	") == "	int i32test;");
+	writefln("Checking type...");
+	assert(child.type == "int32");
+	writefln("Checking name...");
+	assert(child.name == "i32test");
+	writefln("Checking message index...");
+	assert(child.index == 1);
+	writefln("Checking output...");
+	debug writefln("%s",child.toDString("	"));
+	assert(child.toDString("	") == "	int i32test;\n");
 	return 0;
 }
 

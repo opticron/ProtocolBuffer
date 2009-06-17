@@ -90,33 +90,17 @@ struct PBRoot {
 
 }
 
-char[]pbstr = "   
-package myfirstpackage;
-// my comments hopefully won't explode anything
-   message Person {required string name= 1;
-  required int32 id =2;
-  optional string email = 3 ;
-
-  enum PhoneType{
-    MOBILE= 0;HOME =1;
-    // gotta make sure comments work everywhere
-    WORK=2 ;}
-
-  message PhoneNumber {
-    required string number = 1;
-    //woah, comments in a sub-definition  
-    optional PhoneType type = 2 ;
-  }
-
-  repeated PhoneNumber phone = 4;
-}
-//especially here    
-";
 
 unittest {
+	char[]pbstr = "   \npackage myfirstpackage;\n// my comments hopefully won't explode anything\n   message Person {required string name= 1;\n  required int32 id =2;\n  optional string email = 3 ;\n\n  enum PhoneType{\n    MOBILE= 0;HOME =1;\n    // gotta make sure comments work everywhere\n    WORK=2 ;}\n\n  message PhoneNumber {\n    required string number = 1;\n    //woah, comments in a sub-definition  \n    optional PhoneType type = 2 ;\n  }\n\n  repeated PhoneNumber phone = 4;\n}\n//especially here    \n";
+	char[]compstr = "module myfirstpackage;\nclass Person {\n	enum PhoneType {\n		MOBILE = 0,\n		HOME = 1,\n		WORK = 2,\n	}\n	class PhoneNumber {\n		char[] number;\n		PhoneType type;\n	}\n	char[] name;\n	int id;\n	char[] email;\n	PhoneNumber phone;\n}\n";
 	writefln("unittest ProtocolBuffer.pbroot");
 	auto root = PBRoot(pbstr);
-	writefln(root.toDString);
+	debug {
+		writefln("Generated string:\n%s",root.toDString);
+		writefln("Correct string:\n%s",compstr);
+	}
+	assert(root.toDString == compstr);
 	return 0;
 }
 

@@ -89,6 +89,11 @@ struct PBEnum {
 unittest {
 	// XXX wrie unit tests for this XXX
 	writefln("unittest ProtocolBuffer.pbenum");
+	// the leading whitespace is assumed to already have been stripped
+	char[]estring = "enum potato {TOTALS = 1;JUNK= 5 ; ALL =3;}";
+	auto edstring = PBEnum(estring).toDString("");
+	debug writefln("%s",edstring);
+	assert(edstring == "enum potato {\n	TOTALS = 1,\n	ALL = 3,\n	JUNK = 5,\n}\n");
 	return 0;
 }
 
