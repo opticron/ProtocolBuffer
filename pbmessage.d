@@ -40,6 +40,8 @@ struct PBMessage {
 		foreach(pbchild;children) {
 			retstr ~= pbchild.toDString(indent);
 		}
+		// here is where we add the code to serialize and deserialize
+		
 		// guaranteed to work, since we tack on a tab earlier
 		indent = indent[0..$-1];
 		retstr ~= indent~"}\n";
