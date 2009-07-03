@@ -94,7 +94,6 @@ struct PBMessage {
 			default:
 				// XXX fix this message XXX
 				throw new PBParseException("Message Definition","Only extend, service, package, and message are allowed here.");
-				break;
 			}
 			// this needs to stay at the end
 			pbstring = stripLWhite(pbstring);
@@ -108,13 +107,13 @@ struct PBMessage {
 unittest {
 	char[]instring = "message glorm{\noptional int32 i32test = 1;\nmessage simple { }\noptional simple quack = 5;\n}\n";
 	char[]compstr = "class glorm {\n	class simple {\n	}\n	int i32test;\n	simple quack;\n}\n";
-	writefln("unittest ProtocolBuffer.pbroot");
+	writefln("unittest ProtocolBuffer.pbmessage");
 	auto msg = PBMessage(instring);
 	debug {
 		writefln("Correct output:\n%s",compstr);
 		writefln("Generated output:\n%s",msg.toDString(""));
 	}
 	assert(msg.toDString("") == compstr);
-	return 0;
+	debug writefln("");
 }
 

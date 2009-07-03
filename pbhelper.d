@@ -8,7 +8,13 @@ import std.string;
 byte[]toVarint(byte field,bool input) {
 	return toVarint(field,cast(long)(input?1:0));
 }
+byte[]toVarint(byte field,uint input) {
+	return toVarint(field,cast(long)input);
+}
 byte[]toVarint(byte field,int input) {
+	return toVarint(field,cast(long)input);
+}
+byte[]toVarint(byte field,ulong input) {
 	return toVarint(field,cast(long)input);
 }
 byte[]toVarint(byte field,long input) {
@@ -18,8 +24,9 @@ byte[]toVarint(byte field,long input) {
 		// shortcut negative numbers, this is always the case
 		ret.length = 11;
 	} else {
-		int tmp = input;
+		long tmp = input;
 		for (x = 1;tmp >= 128;x++) {
+			// arithmetic shift is fine, because we've already checked for negative numbers
 			tmp >>= 7;
 		}
 		x++; // have to account for the header byte containing the field number and wire type
@@ -35,7 +42,7 @@ byte[]toVarint(byte field,long input) {
 	ret[$-1] &= 0b1111111;
 	// set up the header byte
 	// wiretype is 0, so all we need is the shifted field number
-	ret[0] = field<<3;
+	ret[0] = cast(byte)(field<<3);
 	return ret;
 }
 
@@ -49,9 +56,9 @@ in {
 	for (x = 0;x<=input.length;x++) {
 		if (x == input.length) throw new Exception(
 			"Found no end to varint byte string starting with: "~
-			toString(cast(long)input[0],16u)~" "~
-			(input.length>1?toString(cast(long)input[1],16u):"")~" "~
-			(input.length>2?toString(cast(long)input[2],16u):""));
+			toString(cast(ulong)input[0],16u)~" "~
+			(input.length>1?toString(cast(ulong)input[1],16u):"")~" "~
+			(input.length>2?toString(cast(ulong)input[2],16u):""));
 
 		if (!(input[x]>>7)) {
 			// we have a byte with an unset upper bit! huzzah!
@@ -74,6 +81,22 @@ in {
 	return output;
 }
 
+int intFromVarint(inout byte[]input) {
+	long tmp = fromVarint(input);
+	if (tmp <= int.max && tmp >= int.min) {
+		return cast(int)tmp;
+	}
+	throw new Exception("Integer parse is not within the valid range for int32!");
+}
+
+uint uintFromVarint(inout byte[]input) {
+	long tmp = fromVarint(input);
+	if (tmp <= uint.max && tmp >= uint.min) {
+		return cast(int)tmp;
+	}
+	throw new Exception("Integer parse is not within the valid range for uint32!");
+}
+
 int getWireType(byte input) {
 	return input&0b111;
 }
@@ -83,7 +106,7 @@ int getFieldNumber(byte input) {
 }
 
 unittest {
-	writefln("ProtocolBuffer.pbhelper.toVarint");
+	writefln("unittest ProtocolBuffer.pbhelper.toVarint");
 	debug writefln("toVarint(bool)...");
 	byte[]tmp = toVarint(cast(byte)5,true);
 	byte cmp;
@@ -104,30 +127,52 @@ unittest {
 	cmp = cast(byte)0b00000010;
 	debug writefln("second data byte(%b): %b",cmp,tmp[2]);
 	assert(tmp[2] == cmp);
-	debug writefln("toVarint(long)...");
-	//tmp = toVarint(300);
-	//assert(tmp.length == 2);
-	//assert(tmp[0] == 0b10101100);
-	//assert(tmp[1] == 0b00000010);
 	debug writefln("long fromVarint...");
 	// use last value with the header ripped off
 	cmp = tmp[0];
 	tmp = tmp[1..$];
 	long ret = fromVarint(tmp);
 	assert(ret == 300);
+
+	debug writefln("Checking max/min edges...");
+	tmp = toVarint(cast(byte)5,ulong.max);
+	tmp = tmp[1..$];
+	assert(ulong.max == fromVarint(tmp));
+
+	tmp = toVarint(cast(byte)5,long.min);
+	tmp = tmp[1..$];
+	assert(long.min == fromVarint(tmp));
+
+	tmp = toVarint(cast(byte)5,int.min);
+	tmp = tmp[1..$];
+	assert(int.min == intFromVarint(tmp));
+
+	tmp = toVarint(cast(byte)5,uint.max);
+	tmp = tmp[1..$];
+	uint uitmp = uintFromVarint(tmp);
+	debug writefln("%d should be %d",uitmp,uint.max);
+	assert(uint.max == uitmp);
+
+
+	debug writefln("");
 }
 
-byte[]toZigZag(byte field,int input) {
+byte[]toSInt(byte field,int input) {
 	return toVarint(field,(input<<1)^(input>>31));
 }
-byte[]toZigZag(byte field,long input) {
+byte[]toSInt(byte field,long input) {
 	return toVarint(field,(input<<1)^(input>>63));
 }
 
+long fromSInt(byte[]input) {
+	long tmp = fromVarint(input);
+	return (tmp>>1)^cast(long)(tmp&0x1?0xFFFFFFFFFFFFFFFF:0);
+}
+
 unittest {
-	writefln("ProtocolBuffer.pbhelper.toZigZag");
-	debug writefln("toZigZag(int)...");
-	byte[]tmp = toZigZag(cast(byte)12,0);
+	writefln("unittest ProtocolBuffer.pbhelper.toSInt");
+	debug writefln("toSInt(int)...");
+	byte[]tmp = toSInt(cast(byte)12,0);
 	debug writefln("length");
 	assert(tmp.length == 2);
 	byte cmp = cast(byte)0b0;
@@ -137,10 +182,17 @@ unittest {
 	debug writefln("header byte(%b): %b",cmp,tmp[0]);
 	assert(tmp[0] == cmp);
 
-	tmp = toZigZag(cast(byte)12,-2);
+	debug writefln("toSInt(long)...");
+	tmp = toSInt(cast(byte)12,cast(long)-2);
 	debug writefln("length");
 	assert(tmp.length == 2);
 	cmp = cast(byte)0b11;
 	debug writefln("first byte(%b): %b",cmp,tmp[1]);
 	assert(tmp[1] == cmp);
+
+	debug writefln("fromSInt(long)...");
+	// slice off header for reuse
+	tmp = tmp[1..$];
+	assert(-2 == fromSInt(tmp));
+	debug writefln("");
 }

@@ -58,7 +58,6 @@ struct PBRoot {
 				break;
 			default:
 				throw new PBParseException("Root Definition("~root.Package~")","Either there's a definition here that isn't supported, or the definition isn't allowed here.");
-				break;
 			}
 			// rip off whitespace before looking for the next definition
 			pbstring = stripLWhite(pbstring);
@@ -101,7 +100,7 @@ unittest {
 		writefln("Correct string:\n%s",compstr);
 	}
 	assert(root.toDString == compstr);
-	return 0;
+	debug writefln("");
 }
 
 version(unittests) {

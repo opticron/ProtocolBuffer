@@ -46,7 +46,7 @@ struct PBChild {
 		// pull numeric index
 		char[]tmp = stripValidChars(CClass.Numeric,pbstring);
 		if (!tmp.length) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Could not pull numeric index.");
-		child.index = atoi(tmp);
+		child.index = cast(int)atoi(tmp);
 		if (child.index == 0) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Numeric index can not be 0.");
 		pbstring = stripLWhite(pbstring);
 		// now, check to see if we have a semicolon so we can be done
@@ -59,7 +59,6 @@ struct PBChild {
 		if (pbstring[0] != '[') throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","No idea what to do with string after index.");
 		// XXX support options! XXX
 		throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Options are not currently supported.");
-		return child;
 	}
 }
 
@@ -95,17 +94,17 @@ unittest {
 	// assumes leading whitespace has already been stripped
 	char[]childtxt = "optional int32 i32test = 1;";
 	auto child = PBChild(childtxt);
-	writefln("Checking modifier...");
+	debug writefln("Checking modifier...");
 	assert(child.modifier == "optional");
-	writefln("Checking type...");
+	debug writefln("Checking type...");
 	assert(child.type == "int32");
-	writefln("Checking name...");
+	debug writefln("Checking name...");
 	assert(child.name == "i32test");
-	writefln("Checking message index...");
+	debug writefln("Checking message index...");
 	assert(child.index == 1);
-	writefln("Checking output...");
+	debug writefln("Checking output...");
 	debug writefln("%s",child.toDString("	"));
 	assert(child.toDString("	") == "	int i32test;\n");
-	return 0;
+	debug writefln("");
 }
 

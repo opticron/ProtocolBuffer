@@ -78,7 +78,7 @@ struct PBEnum {
 		// now parse a numeric
 		char[]num = stripValidChars(CClass.Numeric,pbstring);
 		if (!num.length) throw new PBParseException("Enum Definition("~name~"."~tmp~")","Could not pull numeric enum value.");
-		values[atoi(num)] = tmp;
+		values[cast(int)atoi(num)] = tmp;
 		pbstring = stripLWhite(pbstring);
 		// make sure we snatch a semicolon
 		if (pbstring[0] != ';') throw new PBParseException("Enum Definition("~name~"."~tmp~"="~num~")","Expected ';'.");
@@ -93,6 +93,6 @@ unittest {
 	auto edstring = PBEnum(estring).toDString("");
 	debug writefln("%s",edstring);
 	assert(edstring == "enum potato {\n	TOTALS = 1,\n	ALL = 3,\n	JUNK = 5,\n}\n");
-	return 0;
+	debug writefln("");
 }
 

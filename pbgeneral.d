@@ -67,33 +67,26 @@ in {
 	switch(type) {
 	case "package":
 		return PBTypes.PB_Package;
-		break;
 	case "enum":
 		return PBTypes.PB_Enum;
-		break;
 	case "message":
 		return PBTypes.PB_Message;
-		break;
 	case "repeated":
 		return PBTypes.PB_Repeated;
-		break;
 	case "required":
 		return PBTypes.PB_Required;
-		break;
 	case "optional":
 		return PBTypes.PB_Optional;
-		break;
 	case "option":
 	case "extension":
 	case "extend":
 	case "service":
 	case "import":
 		throw new PBParseException("Protocol Buffer Definition",capitalize(type)~" definitions are not currently supported.");
-		break;
 	default:
 		throw new PBParseException("Protocol Buffer Definition","Unknown element type "~type~".");
-		break;
 	}
+	throw new PBParseException("Protocol Buffer Definition","Element type "~type~" fell through the switch.");
 }
 
 // this will rip off the next token
@@ -119,16 +112,15 @@ bool isValidChar(CClass cc,char pc) {
 	case CClass.Numeric:
 		if (pc >= '0' && pc <= '9') return true;
 		return false;
-		break;
 	case CClass.Comment:
 		if (pc == '\n') return false;
 		if (pc == '\r') return false;
 		if (pc == '\f') return false;
 		return true;
-		break;
 	default:
 		throw new PBParseException("Name Validation","Cannot validate characters for this PBType name.");
 	}
+	throw new PBParseException("Name Validation","PBType fell through the switch.");
 }
 
 bool validIdentifier(char[]ident)
@@ -156,12 +148,12 @@ in {
 
 unittest {
 	writefln("unittest ProtocolBuffer.pbgeneral");
-	writefln("Checking stripLWhite...");
+	debug writefln("Checking stripLWhite...");
 	assert("asdf " == stripLWhite("  \n	asdf "));
-	writefln("Checking validIdentifier...");
+	debug writefln("Checking validIdentifier...");
 	assert(validIdentifier("asdf"));
 	assert(!validIdentifier("8asdf"));
-	writefln("Checking stripValidChars...");
+	debug writefln("Checking stripValidChars...");
 	char[]tmp = "asdf1 yarrr";
 	assert(stripValidChars(CClass.Identifier,tmp) == "asdf1");
 	assert(tmp == " yarrr");
@@ -169,6 +161,6 @@ unittest {
 	assert(stripValidChars(CClass.MultiIdentifier,tmp) == "as2f.ya7rr");
 	assert(tmp == " -adfbads25737");
 	// XXX these need to be finished up for all functions XXX
-	return 0;
+	debug writefln("");
 }
 
