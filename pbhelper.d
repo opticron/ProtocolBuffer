@@ -42,7 +42,7 @@ byte[]toVarint(byte field,long input) {
 	ret[$-1] &= 0b1111111;
 	// set up the header byte
 	// wiretype is 0, so all we need is the shifted field number
-	ret[0] = cast(byte)(field<<3);
+	ret[0] = genHeader(field,0);
 	return ret;
 }
 
@@ -105,6 +105,10 @@ int getFieldNumber(byte input) {
 	return (input>>3)&0b1111;
 }
 
+byte genHeader(byte field,byte wiretype) {
+	return cast(byte)((field<<3)|(wiretype&0x3));
+}
+
 unittest {
 	writefln("unittest ProtocolBuffer.pbhelper.toVarint");
 	debug writefln("toVarint(bool)...");
@@ -152,8 +156,7 @@ unittest {
 	uint uitmp = uintFromVarint(tmp);
 	debug writefln("%d should be %d",uitmp,uint.max);
 	assert(uint.max == uitmp);
-
-
+	assert(tmp.length == 0);
 	debug writefln("");
 }
 
@@ -164,7 +167,7 @@ byte[]toSInt(byte field,long input) {
 	return toVarint(field,(input<<1)^(input>>63));
 }
 
-long fromSInt(byte[]input) {
+long fromSInt(inout byte[]input) {
 	long tmp = fromVarint(input);
 	return (tmp>>1)^cast(long)(tmp&0x1?0xFFFFFFFFFFFFFFFF:0);
 }
@@ -194,5 +197,64 @@ unittest {
 	// slice off header for reuse
 	tmp = tmp[1..$];
 	assert(-2 == fromSInt(tmp));
+	assert(tmp.length == 0);
+	debug writefln("");
+}
+
+// here are the remainder of the numeric types, basically just 32 and 64 bit blobs
+// valid for uint, float, ulong, and double
+byte[]toByteBlob(T)(byte field,T input) {
+	byte[]ret;
+	ret.length = T.sizeof+1;
+	byte[]tmp = (cast(byte*)&input)[0..T.sizeof].dup;
+	version (BigEndian) {tmp.reverse;}
+	ret[1..T.sizeof+1] = tmp[0..T.sizeof];
+	ret[0] = genHeader(field,1);
+	return ret;
+}
+
+T fromByteBlob(T)(inout byte[]input)
+in {
+	assert(input.length >= T.sizeof);
+} body {
+	T ret;
+	byte[]tmp = input[0..T.sizeof]; 
+	input = input[T.sizeof..$];
+	version (BigEndian) {tmp.reverse;}
+	(cast(byte*)&ret)[0..T.sizeof] = tmp[0..T.sizeof];
+	return ret;
+}
+
+unittest {
+	writefln("unittest ProtocolBuffer.pbhelper.byteblobs");
+	byte[]tmp = toByteBlob!(double)(cast(byte)5,1.542)[1..$];
+	assert(1.542 == fromByteBlob!(double)(tmp));
+	assert(tmp.length == 0);
+	debug writefln("");
+}
+
+// string functions!
+byte[]toByteString(byte field,char[]input) {
+	// we need to rip off the generated header byte for code reuse, this could be done better
+	byte[]tmp = toVarint(cast(byte)0,input.length)[1..$];
+	return genHeader(field,2)~tmp~cast(byte[])input;
+}
+
+char[]fromByteString(inout byte[]input) {
+	uint len = cast(uint)fromVarint(input);
+	if (len > input.length) {
+		throw new Exception("String length exceeds length of input byte array.");
+	}
+	char[]ret = cast(char[])input[0..len];
+	input = input[len..$];
+	return ret;
+}
+
+unittest {
+	writefln("unittest ProtocolBuffer.pbhelper.byteblobs");
+	char[]test = "My toast has been stolen!";
+	byte[]tmp = toByteString(cast(byte)15,test)[1..$];
+	assert(test == fromByteString(tmp));
+	assert(tmp.length == 0);
 	debug writefln("");
 }
