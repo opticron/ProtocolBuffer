@@ -41,11 +41,68 @@ struct PBMessage {
 			retstr ~= pbchild.toDString(indent);
 		}
 		// here is where we add the code to serialize and deserialize
+		retstr ~= genSerCode(indent);
+		retstr ~= genDesCode(indent);
+		// need to define accessors here XXX
 		
 		// guaranteed to work, since we tack on a tab earlier
 		indent = indent[0..$-1];
 		retstr ~= indent~"}\n";
 		return retstr;
+	}
+
+	char[]genSerCode(char[]indent) {
+		char[]ret = "";
+		// use 16 as a default value, since a nibble can not produce that number
+		ret ~= indent~"byte[]Serialize(byte field = 16) {\n";
+		indent = indent~"	";
+		// codegen is fun!
+		ret ~= indent~"byte[]ret;\n";
+		// serialization code goes here
+		foreach(pbchild;children) {
+			ret ~= pbchild.genSerLine(indent);
+		}
+
+		// include code to determine if we need to add a tag and a length
+		ret ~= indent~"// take care of header and length generation if necessary\n";
+		ret ~= indent~"if (field != 16) {\n";
+		// take care of length calculation and integration of header and length
+		ret ~= indent~"	ret ~= genHeader(field,2)~toVarint(ret.length,field)[1..$]~ret;\n";
+		ret ~= indent~"}\n";
+
+		ret ~= indent~"return ret;\n";
+		indent = indent[0..$-1];
+		ret ~= indent~"}\n";
+		return ret;
+	}
+
+	char[]genDesCode(char[]indent) {
+		char[]ret = "";
+		// add comments
+		ret ~= indent~"// assume that anything sent into deserialize is now owned by the object being created\n";
+		ret ~= indent~"static "~name~" Deserialize(byte[]input) {\n";
+		indent = indent~"	";
+		ret ~= indent~"auto retobj = new "~name~";\n";
+
+		// deserialization code goes here
+		ret ~= indent~"while(input.length) {\n";
+		indent = indent~"	";
+		ret ~= indent~"switch(getFieldNumber(input[0])) {\n";
+		//here goes the meat, handily, it is generated in the children
+		foreach(pbchild;children) {
+			ret ~= pbchild.genDesLine(indent);
+		}
+		// take care of default case
+		ret ~= "default:\n";
+		// XXX finish this
+		ret ~= indent~"}\n";
+		indent = indent[0..$-1];
+		ret ~= indent~"}\n";
+
+		ret ~= indent~"return retobj;\n";
+		indent = indent[0..$-1];
+		ret ~= indent~"}\n";
+		return ret;
 	}
 
 	// string-modifying constructor

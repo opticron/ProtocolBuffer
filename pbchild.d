@@ -47,7 +47,8 @@ struct PBChild {
 		char[]tmp = stripValidChars(CClass.Numeric,pbstring);
 		if (!tmp.length) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Could not pull numeric index.");
 		child.index = cast(int)atoi(tmp);
-		if (child.index == 0) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Numeric index can not be 0.");
+		if (child.index <= 0) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Numeric index can not be less than 1.");
+		if (child.index > 15) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Numeric index can not be greater than 15.");
 		pbstring = stripLWhite(pbstring);
 		// now, check to see if we have a semicolon so we can be done
 		if (pbstring[0] == ';') {
@@ -60,10 +61,52 @@ struct PBChild {
 		// XXX support options! XXX
 		throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Options are not currently supported.");
 	}
+
+	char[]genSerLine(char[]indent) {
+		switch(type) {
+		case "float","double","sfixed32","sfixed64","fixed32","fixed64":
+			return indent~"ret ~= toByteBlob("~name~",cast(byte)"~toString(index)~");\n";
+		case "bool","int32","int64","uint32","uint64":
+			return indent~"ret ~= toVarint("~name~",cast(byte)"~toString(index)~");\n";
+		case "sint32","sint64":
+			return indent~"ret ~= toSInt("~name~",cast(byte)"~toString(index)~");\n";
+		case "string","bytes":
+			return indent~"ret ~= toByteString("~name~",cast(byte)"~toString(index)~");\n";
+		default:
+			return indent~"ret ~= "~name~".Serialize(cast(byte)"~toString(index)~");\n";
+		}
+		throw new PBParseException("genSerLine("~name~")","Fell through switch.");
+	}
+
+	char[]genDesLine(char[]indent) {
+		char[]ret;
+		// check header byte with case since we're guaranteed to be in a switch
+		ret ~= indent~"case "~toString(index)~":\n";
+		indent ~= "	";
+		// common code!
+		ret ~= indent~"retobj."~name~" = ";
+		switch(type) {
+		case "float","double","sfixed32","sfixed64","fixed32","fixed64":
+			ret ~= "fromByteBlob!("~toDType(type)~")(input);\n";
+			break;
+		case "bool","int32","int64","uint32","uint64":
+			ret ~= "fromVarint!("~toDType(type)~")(input);\n";
+			break;
+		case "sint32","sint64":
+			ret ~= "fromSInt!("~toDType(type)~")(input);\n";
+			break;
+		case "string","bytes":
+			ret ~= "fromByteString!("~toDType(type)~")(input);\n";
+			break;
+		default:
+			// XXX here is where it gets hairy, this can be an enum or a class, i may make enums into classes if necessary
+			break;
+		}
+		return ret;
+	}
 }
 
 char[]toDType(char[]intype) {
-        // XXX fix types here XXX
         char[]retstr;
         switch(intype) {
         case "sint32","sfixed32","int32":
@@ -78,8 +121,11 @@ char[]toDType(char[]intype) {
         case "fixed64","uint64":
                 retstr = "ulong";
                 break;
-        case "string","bytes":
+        case "string":
                 retstr = "char[]";
+                break;
+        case "bytes":
+                retstr = "byte[]";
                 break;
         default:
                 // this takes care of float, double, and bool as well

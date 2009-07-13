@@ -5,19 +5,19 @@ import std.string;
 
 // varint translation code
 // XXX I hereby guarantee that this will be fucked up by a differing endian system XXX
-byte[]toVarint(byte field,bool input) {
-	return toVarint(field,cast(long)(input?1:0));
+byte[]toVarint(bool input,byte field) {
+	return toVarint(cast(long)(input?1:0),field);
 }
-byte[]toVarint(byte field,uint input) {
-	return toVarint(field,cast(long)input);
+byte[]toVarint(uint input,byte field) {
+	return toVarint(cast(long)input,field);
 }
-byte[]toVarint(byte field,int input) {
-	return toVarint(field,cast(long)input);
+byte[]toVarint(int input,byte field) {
+	return toVarint(cast(long)input,field);
 }
-byte[]toVarint(byte field,ulong input) {
-	return toVarint(field,cast(long)input);
+byte[]toVarint(ulong input,byte field) {
+	return toVarint(cast(long)input,field);
 }
-byte[]toVarint(byte field,long input) {
+byte[]toVarint(long input,byte field) {
 	byte[]ret;
 	int x;
 	if (input < 0) {
@@ -46,7 +46,7 @@ byte[]toVarint(byte field,long input) {
 	return ret;
 }
 
-long fromVarint(inout byte[]input)
+T fromVarint(T)(inout byte[]input)
 in {
 	assert(input.length);
 } body {
@@ -78,23 +78,10 @@ in {
 		}
 		output <<= 7;
 	}
-	return output;
-}
-
-int intFromVarint(inout byte[]input) {
-	long tmp = fromVarint(input);
-	if (tmp <= int.max && tmp >= int.min) {
-		return cast(int)tmp;
+	if (output > T.max || output < T.min) {
+		throw new Exception("Integer parse is not within the valid range.");
 	}
-	throw new Exception("Integer parse is not within the valid range for int32!");
-}
-
-uint uintFromVarint(inout byte[]input) {
-	long tmp = fromVarint(input);
-	if (tmp <= uint.max && tmp >= uint.min) {
-		return cast(int)tmp;
-	}
-	throw new Exception("Integer parse is not within the valid range for uint32!");
+	return cast(T)output;
 }
 
 int getWireType(byte input) {
@@ -112,7 +99,7 @@ byte genHeader(byte field,byte wiretype) {
 unittest {
 	writefln("unittest ProtocolBuffer.pbhelper.toVarint");
 	debug writefln("toVarint(bool)...");
-	byte[]tmp = toVarint(cast(byte)5,true);
+	byte[]tmp = toVarint(true,cast(byte)5);
 	byte cmp;
 	debug writefln("length");
 	assert(tmp.length == 2);
@@ -122,7 +109,7 @@ unittest {
 	debug writefln("first data byte(%b): %b",cmp,tmp[1]);
 	assert(tmp[1] == cmp);
 	debug writefln("toVarint(int)...");
-	tmp = toVarint(cast(byte)12,300);
+	tmp = toVarint(300,cast(byte)12);
 	debug writefln("length");
 	assert(tmp.length == 3);
 	cmp = cast(byte)0b10101100;
@@ -135,47 +122,52 @@ unittest {
 	// use last value with the header ripped off
 	cmp = tmp[0];
 	tmp = tmp[1..$];
-	long ret = fromVarint(tmp);
+	long ret = fromVarint!(long)(tmp);
 	assert(ret == 300);
 
 	debug writefln("Checking max/min edges...");
-	tmp = toVarint(cast(byte)5,ulong.max);
+	tmp = toVarint(ulong.max,cast(byte)5);
 	tmp = tmp[1..$];
-	assert(ulong.max == fromVarint(tmp));
+	assert(ulong.max == fromVarint!(ulong)(tmp));
 
-	tmp = toVarint(cast(byte)5,long.min);
+	tmp = toVarint(long.min,cast(byte)5);
 	tmp = tmp[1..$];
-	assert(long.min == fromVarint(tmp));
+	assert(long.min == fromVarint!(long)(tmp));
 
-	tmp = toVarint(cast(byte)5,int.min);
+	tmp = toVarint(int.min,cast(byte)5);
 	tmp = tmp[1..$];
-	assert(int.min == intFromVarint(tmp));
+	assert(int.min == fromVarint!(int)(tmp));
 
-	tmp = toVarint(cast(byte)5,uint.max);
+	tmp = toVarint(uint.max,cast(byte)5);
 	tmp = tmp[1..$];
-	uint uitmp = uintFromVarint(tmp);
+	uint uitmp = fromVarint!(uint)(tmp);
 	debug writefln("%d should be %d",uitmp,uint.max);
 	assert(uint.max == uitmp);
 	assert(tmp.length == 0);
 	debug writefln("");
 }
 
-byte[]toSInt(byte field,int input) {
-	return toVarint(field,(input<<1)^(input>>31));
+// zigzag encoding and decodings
+byte[]toSInt(int input,byte field) {
+	return toVarint((input<<1)^(input>>31),field);
 }
-byte[]toSInt(byte field,long input) {
-	return toVarint(field,(input<<1)^(input>>63));
+byte[]toSInt(long input,byte field) {
+	return toVarint((input<<1)^(input>>63),field);
 }
 
-long fromSInt(inout byte[]input) {
-	long tmp = fromVarint(input);
-	return (tmp>>1)^cast(long)(tmp&0x1?0xFFFFFFFFFFFFFFFF:0);
+T fromSInt(T)(inout byte[]input) {
+	static if (!is(T == int) && !is(T == long)) {
+		throw new Exception("fromSInt only works with types int or long.");
+	}
+	T tmp = fromVarint!(T)(input);
+	tmp = (tmp>>1)^cast(T)(tmp&0x1?0xFFFFFFFFFFFFFFFF:0);
+	return tmp;
 }
 
 unittest {
 	writefln("unittest ProtocolBuffer.pbhelper.toSInt");
 	debug writefln("toSInt(int)...");
-	byte[]tmp = toSInt(cast(byte)12,0);
+	byte[]tmp = toSInt(0,cast(byte)12);
 	debug writefln("length");
 	assert(tmp.length == 2);
 	byte cmp = cast(byte)0b0;
@@ -186,7 +178,7 @@ unittest {
 	assert(tmp[0] == cmp);
 
 	debug writefln("toSInt(long)...");
-	tmp = toSInt(cast(byte)12,cast(long)-2);
+	tmp = toSInt(cast(long)-2,cast(byte)12);
 	debug writefln("length");
 	assert(tmp.length == 2);
 	cmp = cast(byte)0b11;
@@ -196,14 +188,14 @@ unittest {
 	debug writefln("fromSInt(long)...");
 	// slice off header for reuse
 	tmp = tmp[1..$];
-	assert(-2 == fromSInt(tmp));
+	assert(-2 == fromSInt!(long)(tmp));
 	assert(tmp.length == 0);
 	debug writefln("");
 }
 
 // here are the remainder of the numeric types, basically just 32 and 64 bit blobs
 // valid for uint, float, ulong, and double
-byte[]toByteBlob(T)(byte field,T input) {
+byte[]toByteBlob(T)(T input,byte field) {
 	byte[]ret;
 	ret.length = T.sizeof+1;
 	byte[]tmp = (cast(byte*)&input)[0..T.sizeof].dup;
@@ -227,25 +219,25 @@ in {
 
 unittest {
 	writefln("unittest ProtocolBuffer.pbhelper.byteblobs");
-	byte[]tmp = toByteBlob!(double)(cast(byte)5,1.542)[1..$];
+	byte[]tmp = toByteBlob!(double)(1.542,cast(byte)5)[1..$];
 	assert(1.542 == fromByteBlob!(double)(tmp));
 	assert(tmp.length == 0);
 	debug writefln("");
 }
 
 // string functions!
-byte[]toByteString(byte field,char[]input) {
+byte[]toByteString(T:T[])(T[]input,byte field) {
 	// we need to rip off the generated header byte for code reuse, this could be done better
-	byte[]tmp = toVarint(cast(byte)0,input.length)[1..$];
+	byte[]tmp = toVarint(input.length,cast(byte)0)[1..$];
 	return genHeader(field,2)~tmp~cast(byte[])input;
 }
 
-char[]fromByteString(inout byte[]input) {
-	uint len = cast(uint)fromVarint(input);
+T[]fromByteString(T:T[])(inout byte[]input) {
+	uint len = fromVarint!(uint)(input);
 	if (len > input.length) {
 		throw new Exception("String length exceeds length of input byte array.");
 	}
-	char[]ret = cast(char[])input[0..len];
+	T[]ret = cast(T[])input[0..len];
 	input = input[len..$];
 	return ret;
 }
@@ -253,8 +245,8 @@ char[]fromByteString(inout byte[]input) {
 unittest {
 	writefln("unittest ProtocolBuffer.pbhelper.byteblobs");
 	char[]test = "My toast has been stolen!";
-	byte[]tmp = toByteString(cast(byte)15,test)[1..$];
-	assert(test == fromByteString(tmp));
+	byte[]tmp = toByteString!(char[])(test,cast(byte)15)[1..$];
+	assert(test == fromByteString!(char[])(tmp));
 	assert(tmp.length == 0);
 	debug writefln("");
 }
