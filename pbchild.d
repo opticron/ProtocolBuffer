@@ -6,9 +6,6 @@ import ProtocolBuffer.pbgeneral;
 import std.string;
 import std.stdio;
 
-// XXX I intentionally left out all identifier validation routines, because the compiler knows how to resolve symbols. XXX
-// XXX This means I don't have to write that code. XXX
-
 struct PBChild {
 	char[]modifier;
 	char[]type;
@@ -74,6 +71,7 @@ struct PBChild {
 			return indent~"ret ~= toByteString("~name~",cast(byte)"~toString(index)~");\n";
 		default:
 			// this covers defined messages and enums
+			// XXX add a static if in the generated code to determine whether a class or enum and act appropriately
 			return indent~"ret ~= "~name~".Serialize(cast(byte)"~toString(index)~");\n";
 		}
 		throw new PBParseException("genSerLine("~name~")","Fell through switch.");
@@ -101,6 +99,7 @@ struct PBChild {
 			break;
 		default:
 			// this covers enums and classen, since enums are declared as classes
+			// XXX add a static if in the generated code to determine whether a class or enum and act appropriately
 			// also, make sure we don't think we're root
 			ret ~= type~".Deserialize(input,false);\n";
 			break;
