@@ -107,6 +107,24 @@ struct PBChild {
 		}
 		return ret;
 	}
+
+	char[]genAccessor(char[]indent) {
+		char[]ret;
+		// get accessor
+		ret ~= indent~toDType(type)~" get_"~name~"() {\n";
+		indent ~= "	";
+		ret ~= indent~"return "~name~";\n";
+		indent = indent[0..$-1];
+		ret ~= indent~"}\n";
+		// set accessor
+		ret ~= indent~"void set_"~name~"("~toDType(type)~" input_var) {\n";
+		indent ~= "	";
+		ret ~= indent~name~" = input_var;\n";
+		indent = indent[0..$-1];
+		ret ~= indent~"}\n";
+		return ret;
+	}
+
 }
 
 char[]toDType(char[]intype) {

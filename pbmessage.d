@@ -43,7 +43,10 @@ struct PBMessage {
 		// here is where we add the code to serialize and deserialize
 		retstr ~= genSerCode(indent);
 		retstr ~= genDesCode(indent);
-		// need to define accessors here XXX
+		// generate accessors
+		foreach(pbchild;children) {
+			retstr ~= pbchild.genAccessor(indent);
+		}
 		
 		// guaranteed to work, since we tack on a tab earlier
 		indent = indent[0..$-1];
