@@ -73,6 +73,7 @@ struct PBChild {
 		case "string","bytes":
 			return indent~"ret ~= toByteString("~name~",cast(byte)"~toString(index)~");\n";
 		default:
+			// this covers defined messages and enums
 			return indent~"ret ~= "~name~".Serialize(cast(byte)"~toString(index)~");\n";
 		}
 		throw new PBParseException("genSerLine("~name~")","Fell through switch.");
@@ -99,7 +100,9 @@ struct PBChild {
 			ret ~= "fromByteString!("~toDType(type)~")(input);\n";
 			break;
 		default:
-			// XXX here is where it gets hairy, this can be an enum or a class, i may make enums into classes if necessary
+			// this covers enums and classen, since enums are declared as classes
+			// also, make sure we don't think we're root
+			ret ~= type~".Deserialize(input,false);\n";
 			break;
 		}
 		return ret;

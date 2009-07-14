@@ -79,21 +79,35 @@ struct PBMessage {
 	char[]genDesCode(char[]indent) {
 		char[]ret = "";
 		// add comments
-		ret ~= indent~"// assume that anything sent into deserialize is now owned by the object being created\n";
-		ret ~= indent~"static "~name~" Deserialize(byte[]input) {\n";
+		ret ~= indent~"// if we're root, we can assume we own the whole string\n";
+		ret ~= indent~"// if not, the first thing we need to do is pull the length that belongs to us\n";
+		ret ~= indent~"static "~name~" Deserialize(inout byte[]manip,bool isroot=true) {\n";
 		indent = indent~"	";
 		ret ~= indent~"auto retobj = new "~name~";\n";
+		ret ~= indent~"byte[]input = manip;\n";
+
+		ret ~= indent~"// cut apart the input string\n";
+		ret ~= indent~"if (!isroot) {\n";
+		indent = indent~"	";
+		ret ~= indent~"uint len = fromVarint!(uint)(manip);\n";
+		ret ~= indent~"input = manip[0..len];\n";
+		ret ~= indent~"manip = manip[len..$];\n";
+		indent = indent[0..$-1];
+		ret ~= indent~"}\n";
 
 		// deserialization code goes here
 		ret ~= indent~"while(input.length) {\n";
 		indent = indent~"	";
-		ret ~= indent~"switch(getFieldNumber(input[0])) {\n";
+		ret ~= indent~"byte header = input[0];\n";
+		ret ~= indent~"input = input[1..$];\n";
+		ret ~= indent~"switch(getFieldNumber(header)) {\n";
 		//here goes the meat, handily, it is generated in the children
 		foreach(pbchild;children) {
 			ret ~= pbchild.genDesLine(indent);
 		}
 		// take care of default case
-		ret ~= "default:\n";
+		ret ~= indent~"default:\n";
+		ret ~= indent~"// XXX I don't know what to do with unknown fields, yet\n";
 		// XXX finish this
 		ret ~= indent~"}\n";
 		indent = indent[0..$-1];

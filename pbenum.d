@@ -15,10 +15,15 @@ struct PBEnum {
 	// XXX need to support options at some point XXX
 	char[]toDString(char[]indent) {
 		char[]retstr = "";
-		retstr ~= indent~"enum "~name~" {\n";
+		retstr ~= indent~"class "~name~" {\n";
+		indent ~= indent~"	";
+		retstr ~= indent~"enum {\n";
 		foreach (key,value;values) {
 			retstr ~= indent~"	"~value~" = "~toString(key)~",\n";
 		}
+		retstr ~= indent~"}\n";
+		// XXX define serialization and deserialization functions here
+		indent = indent[0..$-1];
 		retstr ~= indent~"}\n";
 		return retstr;
 	}
@@ -92,7 +97,7 @@ unittest {
 	char[]estring = "enum potato {TOTALS = 1;JUNK= 5 ; ALL =3;}";
 	auto edstring = PBEnum(estring).toDString("");
 	debug writefln("%s",edstring);
-	assert(edstring == "enum potato {\n	TOTALS = 1,\n	ALL = 3,\n	JUNK = 5,\n}\n");
+	assert(edstring == "class potato {\n	enum {\n		TOTALS = 1,\n		ALL = 3,\n		JUNK = 5,\n	}\n}\n");
 	debug writefln("");
 }
 
