@@ -24,7 +24,7 @@ struct PBMessage {
 	// XXX need to support services at some point XXX
 	char[]toDString(char[]indent) {
 		char[]retstr = "";
-		retstr ~= indent~"class "~name~" {\n";
+		retstr ~= indent~(indent.length?"static ":"")~"class "~name~" {\n";
 		indent = indent~"	";
 		// fill the class with goodies!
 		// first, we'll do the enums!

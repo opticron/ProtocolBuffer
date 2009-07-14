@@ -87,7 +87,7 @@ struct PBChild {
 		default:
 			// this covers defined messages and enums
 			char[]ret;
-			ret ~= indent~"static if (is("~type~":class)) {\n";
+			ret ~= indent~"static if (is("~type~":Object)) {\n";
 			ret ~= indent~"	ret ~= "~name~".Serialize(cast(byte)"~toString(index)~");\n";
 			ret ~= indent~"} else {\n";
 			ret ~= indent~"	// this is an enum, almost certainly\n";
@@ -122,7 +122,7 @@ struct PBChild {
 			// this covers enums and classen, since enums are declared as classes
 			// also, make sure we don't think we're root
 			ret = indent~"case "~toString(index)~":\n";
-			ret ~= indent~"static if (is("~type~":class)) {\n";
+			ret ~= indent~"static if (is("~type~":Object)) {\n";
 			ret ~= indent~"	retobj."~name~" = "~type~".Deserialize(input,false);\n";
 			ret ~= indent~"} else {\n";
 			ret ~= indent~"	// this is an enum, almost certainly\n";
