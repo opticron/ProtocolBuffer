@@ -24,7 +24,6 @@ struct PBMessage {
 	// XXX need to support services at some point XXX
 	char[]toDString(char[]indent) {
 		char[]retstr = "";
-		// XXX do we want to inherit from a class or use a templated class? XXX
 		retstr ~= indent~"class "~name~" {\n";
 		indent = indent~"	";
 		// fill the class with goodies!
