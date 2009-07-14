@@ -11,9 +11,24 @@ struct PBChild {
 	char[]type;
 	char[]name;
 	int index;
+	// this takes care of definition and accessors
 	char[]toDString(char[]indent) {
 		// XXX need to take care of defaults here once we support options XXX
-		return indent~toDType(type)~" "~name~";\n";
+		char[]ret;
+		ret ~= indent~toDType(type)~" "~name~";\n";
+		// get accessor
+		ret ~= indent~toDType(type)~" get_"~name~"() {\n";
+		indent ~= "	";
+		ret ~= indent~"return "~name~";\n";
+		indent = indent[0..$-1];
+		ret ~= indent~"}\n";
+		// set accessor
+		ret ~= indent~"void set_"~name~"("~toDType(type)~" input_var) {\n";
+		indent ~= "	";
+		ret ~= indent~name~" = input_var;\n";
+		indent = indent[0..$-1];
+		ret ~= indent~"}\n";
+		return ret;
 	}
 
 	static PBChild opCall(inout char[]pbstring)
@@ -71,8 +86,14 @@ struct PBChild {
 			return indent~"ret ~= toByteString("~name~",cast(byte)"~toString(index)~");\n";
 		default:
 			// this covers defined messages and enums
-			// XXX add a static if in the generated code to determine whether a class or enum and act appropriately
-			return indent~"ret ~= "~name~".Serialize(cast(byte)"~toString(index)~");\n";
+			char[]ret;
+			ret ~= indent~"static if (is("~type~":class)) {\n";
+			ret ~= indent~"	ret ~= "~name~".Serialize(cast(byte)"~toString(index)~");\n";
+			ret ~= indent~"} else {\n";
+			ret ~= indent~"	// this is an enum, almost certainly\n";
+			ret ~= indent~"	ret ~= toVarint!(int)("~name~",cast(byte)"~toString(index)~");\n";
+			ret ~= indent~"}\n";
+			return ret;
 		}
 		throw new PBParseException("genSerLine("~name~")","Fell through switch.");
 	}
@@ -99,31 +120,18 @@ struct PBChild {
 			break;
 		default:
 			// this covers enums and classen, since enums are declared as classes
-			// XXX add a static if in the generated code to determine whether a class or enum and act appropriately
 			// also, make sure we don't think we're root
-			ret ~= type~".Deserialize(input,false);\n";
+			ret = indent~"case "~toString(index)~":\n";
+			ret ~= indent~"static if (is("~type~":class)) {\n";
+			ret ~= indent~"	retobj."~name~" = "~type~".Deserialize(input,false);\n";
+			ret ~= indent~"} else {\n";
+			ret ~= indent~"	// this is an enum, almost certainly\n";
+			ret ~= indent~"	retobj."~name~" = fromVarint!(int)(input);\n";
+			ret ~= indent~"}\n";
 			break;
 		}
 		return ret;
 	}
-
-	char[]genAccessor(char[]indent) {
-		char[]ret;
-		// get accessor
-		ret ~= indent~toDType(type)~" get_"~name~"() {\n";
-		indent ~= "	";
-		ret ~= indent~"return "~name~";\n";
-		indent = indent[0..$-1];
-		ret ~= indent~"}\n";
-		// set accessor
-		ret ~= indent~"void set_"~name~"("~toDType(type)~" input_var) {\n";
-		indent ~= "	";
-		ret ~= indent~name~" = input_var;\n";
-		indent = indent[0..$-1];
-		ret ~= indent~"}\n";
-		return ret;
-	}
-
 }
 
 char[]toDType(char[]intype) {
@@ -170,7 +178,16 @@ unittest {
 	assert(child.index == 1);
 	debug writefln("Checking output...");
 	debug writefln("%s",child.toDString("	"));
-	assert(child.toDString("	") == "	int i32test;\n");
+	childtxt = 
+"	int i32test;
+	int get_i32test() {
+		return i32test;
+	}
+	void set_i32test(int input_var) {
+		i32test = input_var;
+	}
+";
+	assert(child.toDString("	") == childtxt);
 	debug writefln("");
 }
 

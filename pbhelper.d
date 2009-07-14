@@ -4,7 +4,7 @@ import std.string;
 // here is where all the encodings are defined and translated between bytes and real representations
 
 // varint translation code
-// XXX I hereby guarantee that this will be fucked up by a differing endian system XXX
+// this may have endian issues, maybe not, we'll see
 byte[]toVarint(bool input,byte field) {
 	return toVarint(cast(long)(input?1:0),field);
 }

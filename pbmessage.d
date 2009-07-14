@@ -42,10 +42,6 @@ struct PBMessage {
 		// here is where we add the code to serialize and deserialize
 		retstr ~= genSerCode(indent);
 		retstr ~= genDesCode(indent);
-		// generate accessors
-		foreach(pbchild;children) {
-			retstr ~= pbchild.genAccessor(indent);
-		}
 		
 		// guaranteed to work, since we tack on a tab earlier
 		indent = indent[0..$-1];
@@ -165,7 +161,6 @@ struct PBMessage {
 				stripValidChars(CClass.Comment,pbstring);
 				break;
 			default:
-				// XXX fix this message XXX
 				throw new PBParseException("Message Definition","Only extend, service, package, and message are allowed here.");
 			}
 			// this needs to stay at the end
