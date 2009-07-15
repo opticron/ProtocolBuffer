@@ -42,6 +42,10 @@ struct PBMessage {
 		// here is where we add the code to serialize and deserialize
 		retstr ~= genSerCode(indent);
 		retstr ~= genDesCode(indent);
+		// include a static opcall to do deserialization to make coding simpler
+		retstr ~= indent~"static "~name~" opCall(inout byte[]input) {\n";
+		retstr ~= indent~"	return Deserialize(input);\n";
+		retstr ~= indent~"}\n";
 		
 		// guaranteed to work, since we tack on a tab earlier
 		indent = indent[0..$-1];
