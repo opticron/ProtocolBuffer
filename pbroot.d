@@ -19,6 +19,7 @@ struct PBRoot {
 	char[]toDString(char[]indent="") {
 		char[]retstr = "";
 		retstr ~= "module "~Package~";\n";
+		retstr ~= "import ProtocolBuffer.pbhelper;\n";
 		// write out enums
 		foreach(pbenum;enum_defs) {
 			retstr ~= pbenum.toDString(indent);
