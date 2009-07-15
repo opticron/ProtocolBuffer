@@ -69,7 +69,7 @@ struct PBMessage {
 		ret ~= indent~"// take care of header and length generation if necessary\n";
 		ret ~= indent~"if (field != 16) {\n";
 		// take care of length calculation and integration of header and length
-		ret ~= indent~"	ret ~= genHeader(field,2)~toVarint(ret.length,field)[1..$]~ret;\n";
+		ret ~= indent~"	ret = genHeader(field,2)~toVarint(ret.length,field)[1..$]~ret;\n";
 		ret ~= indent~"}\n";
 
 		ret ~= indent~"return ret;\n";
