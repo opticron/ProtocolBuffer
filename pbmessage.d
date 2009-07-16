@@ -97,6 +97,11 @@ struct PBMessage {
 		indent = indent[0..$-1];
 		ret ~= indent~"}\n";
 
+		// required variable checks go here
+		foreach(pbchild;children) if (pbchild.modifier == "required") {
+			ret ~= indent~"bool _"~pbchild.name~"_check = false;\n";
+		}
+
 		// deserialization code goes here
 		ret ~= indent~"while(input.length) {\n";
 		indent = indent~"	";
@@ -110,11 +115,14 @@ struct PBMessage {
 		// take care of default case
 		ret ~= indent~"default:\n";
 		ret ~= indent~"// XXX I don't know what to do with unknown fields, yet\n";
-		// XXX finish this
 		ret ~= indent~"}\n";
 		indent = indent[0..$-1];
 		ret ~= indent~"}\n";
 
+		// check for required  fields
+		foreach(pbchild;children) if (pbchild.modifier == "required") {
+			ret ~= indent~"if (_"~pbchild.name~"_check == false) throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n";
+		}
 		ret ~= indent~"return retobj;\n";
 		indent = indent[0..$-1];
 		ret ~= indent~"}\n";

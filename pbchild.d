@@ -130,6 +130,9 @@ struct PBChild {
 			ret ~= indent~"}\n";
 			break;
 		}
+		if (modifier == "required") {
+			ret ~= indent~"_"~name~"_check = true;\n";
+		}
 		return ret;
 	}
 }
