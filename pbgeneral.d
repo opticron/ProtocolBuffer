@@ -32,7 +32,6 @@ bool validateMultiIdentifier(char[]ident)
 in {
 	assert(ident.length);
 } body {
-	// XXX assuming that the identifier can't start or end with . and individual parts can't start with numerics XXX
 	char[][]parts = split(ident,".");
 	foreach(part;parts) {
 		if (!part.length) return false;
@@ -124,7 +123,6 @@ bool validIdentifier(char[]ident)
 in {
 	assert(ident.length);
 } body {
-	// XXX for now, we assume that the identifier was pulled using the stripvalidchars function, so we only have to check the first character XXX
 	if (ident[0] >= '0' && ident[0] <= '9') return false;
 	return true;
 }
@@ -150,6 +148,7 @@ unittest {
 	debug writefln("Checking validIdentifier...");
 	assert(validIdentifier("asdf"));
 	assert(!validIdentifier("8asdf"));
+	// also takes care of isValidChar
 	debug writefln("Checking stripValidChars...");
 	char[]tmp = "asdf1 yarrr";
 	assert(stripValidChars(CClass.Identifier,tmp) == "asdf1");
@@ -157,7 +156,7 @@ unittest {
 	tmp = "as2f.ya7rr -adfbads25737";
 	assert(stripValidChars(CClass.MultiIdentifier,tmp) == "as2f.ya7rr");
 	assert(tmp == " -adfbads25737");
-	// XXX these need to be finished up for all functions XXX
+	assert("asdf" == stripLWhite("  	asdf"));
 	debug writefln("");
 }
 

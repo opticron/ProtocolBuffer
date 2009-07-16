@@ -8,8 +8,8 @@ import ProtocolBuffer.pbchild;
 import std.string;
 import std.stdio;
 
-// XXX I intentionally left out all identifier validation routines, because the compiler knows how to resolve symbols. XXX
-// XXX This means I don't have to write that code. XXX
+// I intentionally left out all identifier validation routines, because the compiler knows how to resolve symbols. 
+// This means I don't have to write that code. 
 
 struct PBMessage {
 	char[]name;
