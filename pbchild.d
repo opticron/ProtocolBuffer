@@ -15,15 +15,15 @@ struct PBChild {
 	char[]toDString(char[]indent) {
 		// XXX need to take care of defaults here once we support options XXX
 		char[]ret;
-		ret ~= indent~toDType(type)~" "~name~";\n";
+		ret ~= indent~toDType(type)~(modifier=="repeated"?"[]":" ")~name~";\n";
 		// get accessor
-		ret ~= indent~toDType(type)~" get_"~name~"() {\n";
+		ret ~= indent~toDType(type)~(modifier=="repeated"?"[]":" ")~"get_"~name~"() {\n";
 		indent ~= "	";
 		ret ~= indent~"return "~name~";\n";
 		indent = indent[0..$-1];
 		ret ~= indent~"}\n";
 		// set accessor
-		ret ~= indent~"void set_"~name~"("~toDType(type)~" input_var) {\n";
+		ret ~= indent~"void set_"~name~"("~toDType(type)~(modifier=="repeated"?"[]":" ")~"input_var) {\n";
 		indent ~= "	";
 		ret ~= indent~name~" = input_var;\n";
 		indent = indent[0..$-1];
@@ -75,27 +75,41 @@ struct PBChild {
 	}
 
 	char[]genSerLine(char[]indent) {
+		char[]tname = name;
+		char[]ret;
+		if (modifier == "repeated") {
+			ret ~= indent~"foreach(iter;"~name~") {\n";
+			tname = "iter";
+			indent ~= "	";
+		}
 		switch(type) {
 		case "float","double","sfixed32","sfixed64","fixed32","fixed64":
-			return indent~"ret ~= toByteBlob("~name~",cast(byte)"~toString(index)~");\n";
+			ret ~= indent~"ret ~= toByteBlob("~tname~",cast(byte)"~toString(index)~");\n";
+			break;
 		case "bool","int32","int64","uint32","uint64":
-			return indent~"ret ~= toVarint("~name~",cast(byte)"~toString(index)~");\n";
+			ret ~= indent~"ret ~= toVarint("~tname~",cast(byte)"~toString(index)~");\n";
+			break;
 		case "sint32","sint64":
-			return indent~"ret ~= toSInt("~name~",cast(byte)"~toString(index)~");\n";
+			ret ~= indent~"ret ~= toSInt("~tname~",cast(byte)"~toString(index)~");\n";
+			break;
 		case "string","bytes":
-			return indent~"ret ~= toByteString("~name~",cast(byte)"~toString(index)~");\n";
+			ret ~= indent~"ret ~= toByteString("~tname~",cast(byte)"~toString(index)~");\n";
+			break;
 		default:
 			// this covers defined messages and enums
-			char[]ret;
 			ret ~= indent~"static if (is("~type~":Object)) {\n";
-			ret ~= indent~"	ret ~= "~name~".Serialize(cast(byte)"~toString(index)~");\n";
+			ret ~= indent~"	ret ~= "~tname~".Serialize(cast(byte)"~toString(index)~");\n";
 			ret ~= indent~"} else {\n";
 			ret ~= indent~"	// this is an enum, almost certainly\n";
-			ret ~= indent~"	ret ~= toVarint!(int)("~name~",cast(byte)"~toString(index)~");\n";
+			ret ~= indent~"	ret ~= toVarint!(int)("~tname~",cast(byte)"~toString(index)~");\n";
 			ret ~= indent~"}\n";
-			return ret;
+			break;
 		}
-		throw new PBParseException("genSerLine("~name~")","Fell through switch.");
+		if (modifier == "repeated") {
+			indent = indent[0..$-1];
+			ret ~= indent~"}\n";
+		}
+		return ret;
 	}
 
 	char[]genDesLine(char[]indent) {
@@ -104,7 +118,7 @@ struct PBChild {
 		ret ~= indent~"case "~toString(index)~":\n";
 		indent ~= "	";
 		// common code!
-		ret ~= indent~"retobj."~name~" = ";
+		ret ~= indent~"retobj."~name~" "~(modifier=="repeated"?"~":"")~"= ";
 		switch(type) {
 		case "float","double","sfixed32","sfixed64","fixed32","fixed64":
 			ret ~= "fromByteBlob!("~toDType(type)~")(input);\n";
