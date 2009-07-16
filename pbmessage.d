@@ -26,6 +26,8 @@ struct PBMessage {
 		char[]retstr = "";
 		retstr ~= indent~(indent.length?"static ":"")~"class "~name~" {\n";
 		indent = indent~"	";
+		retstr ~= indent~"// deal with unknown fields\n";
+		retstr ~= indent~"byte[]ufields;\n";
 		// fill the class with goodies!
 		// first, we'll do the enums!
 		foreach(pbenum;enum_defs) {
@@ -64,6 +66,8 @@ struct PBMessage {
 		foreach(pbchild;children) {
 			ret ~= pbchild.genSerLine(indent);
 		}
+		// tack on unknown bytes
+		ret ~= indent~"ret ~= ufields;\n";
 
 		// include code to determine if we need to add a tag and a length
 		ret ~= indent~"// take care of header and length generation if necessary\n";
@@ -114,7 +118,9 @@ struct PBMessage {
 		}
 		// take care of default case
 		ret ~= indent~"default:\n";
-		ret ~= indent~"// XXX I don't know what to do with unknown fields, yet\n";
+		ret ~= indent~"	// rip off unknown fields\n";
+		ret ~= indent~"	retobj.ufields ~= header~ripUField(input,getWireType(header));\n";
+		ret ~= indent~"	break;\n";
 		ret ~= indent~"}\n";
 		indent = indent[0..$-1];
 		ret ~= indent~"}\n";

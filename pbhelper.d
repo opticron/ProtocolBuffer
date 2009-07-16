@@ -201,7 +201,7 @@ byte[]toByteBlob(T)(T input,byte field) {
 	byte[]tmp = (cast(byte*)&input)[0..T.sizeof].dup;
 	version (BigEndian) {tmp.reverse;}
 	ret[1..T.sizeof+1] = tmp[0..T.sizeof];
-	ret[0] = genHeader(field,1);
+	ret[0] = genHeader(field,T.sizeof==8?1:5);
 	return ret;
 }
 
@@ -249,4 +249,30 @@ unittest {
 	assert(test == fromByteString!(char[])(tmp));
 	assert(tmp.length == 0);
 	debug writefln("");
+}
+
+byte[]ripUField(inout byte[]input,byte wiretype) {
+	switch(wiretype) {
+	case 0:
+		// snag a varint
+		return toVarint(fromVarint!(long)(input),cast(byte)0)[1..$];
+	case 1:
+		// snag a 64bit chunk
+		byte[]tmp = input[0..8];
+		input = input[8..$];
+		return tmp;
+	case 2:
+		// snag a length delimited chunk
+		auto blen = fromVarint!(long)(input);
+		byte[]tmp = input[0..blen];
+		return toVarint(blen,cast(byte)0)[1..$]~tmp;
+	case 5:
+		// snag a 32bit chunk
+		byte[]tmp = input[0..4];
+		input = input[4..$];
+		return tmp;
+	default:
+		// shit is broken....
+		throw new Exception("Can't deal with wiretype "~toString(wiretype));
+	}
 }

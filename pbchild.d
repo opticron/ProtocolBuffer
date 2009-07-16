@@ -147,6 +147,8 @@ struct PBChild {
 		if (modifier == "required") {
 			ret ~= indent~"_"~name~"_check = true;\n";
 		}
+		// tack on the break so we don't have fallthrough
+		ret ~= indent~"break;\n";
 		return ret;
 	}
 }
