@@ -54,6 +54,11 @@ struct PBRoot {
 			case PBTypes.PB_Comment:
 				stripValidChars(CClass.Comment,pbstring);
 				break;
+			case PBTypes.PB_Option:
+				// rip of "option" and leading whitespace
+				pbstring = stripLWhite(pbstring["option".length..$]);
+				ripOption(pbstring);
+				break;
 			default:
 				throw new PBParseException("Root Definition("~root.Package~")","Either there's a definition here that isn't supported, or the definition isn't allowed here.");
 			}
