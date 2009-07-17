@@ -168,7 +168,7 @@ struct PBOption {
 }
 
 // XXX actually do something with options
-PBOption ripOption(inout char[]pbstring,char terminator = ';') {
+PBOption ripOption(inout char[]pbstring,char[]terms = ";") {
 	// we need to pull apart the option and stuff it in a struct
 	PBOption pbopt;
 	if (pbstring[0] == '(') {
@@ -197,25 +197,42 @@ PBOption ripOption(inout char[]pbstring,char terminator = ';') {
 	pbstring = pbstring[1..$];
 	pbstring = stripLWhite(pbstring);
 	// the remaining text between here and the terminator is our value
-	// XXX this string pulling code is buggy
-	char tmpterm = terminator;
 	if (pbstring[0] == '"') {
-		pbstring = pbstring[1..$];
-		tmpterm = '"';
+		pbopt.value = ripQuotedValue(pbstring);
+		pbstring = stripLWhite(pbstring);
+		if (terms.find(pbstring[0]) == -1) throw new PBParseException("Option Parse("~pbopt.name~")","Malformed option: Bad terminator("~pbstring[0]~")");
+		// leave the terminator in the string in case the caller wants to look at it
+		return pbopt;
 	}
-	int valend = pbstring.find(tmpterm);
-	if (valend == -1) {
-		throw new PBParseException("Option Parse("~pbopt.name~")","Malformed option: Missing terminator("~tmpterm~")");
-	}
-	pbopt.value = pbstring[0..valend];
-	// we know the terminator is there, so rip it off
-	pbstring = pbstring[valend+1..$];
-	if (tmpterm == '"') {
-		// make sure the real terminator is there
-		if (pbstring[0] != terminator) throw new PBParseException("Option Parse("~pbopt.name~")","Malformed option: Missing terminator("~terminator~")");
-		// rip off the real terminator
-		pbstring = pbstring[1..$];
-	}
+	// take care of non-quoted values
+	pbopt.value = stripValidChars(CClass.Identifier,pbstring);
+	pbstring = stripLWhite(pbstring);
+	if (terms.find(pbstring[0]) == -1) throw new PBParseException("Option Parse("~pbopt.name~")","Malformed option: Bad terminator("~pbstring[0]~")");
 	return pbopt;
 }
 
+char[]ripQuotedValue(inout char[]pbstring) {
+	int x;
+	for(x = 1;pbstring[x] != '"' && x < pbstring.length;x++) {
+	}
+	// inc to take the quotes with us
+	x++;
+	// XXX we should probably do error checking here
+	char[]tmp = pbstring[0..x];
+	pbstring = pbstring[x..$];
+	return tmp;
+}
+
+// this rips line-specific options from the string
+PBOption[]ripOptions(inout char[]pbstring) {
+	PBOption[]ret;
+	while(pbstring.length && pbstring[0] != ']') {
+		// this will rip off the leading [ and intermediary ','s
+		pbstring = pbstring[1..$];
+		ret ~= ripOption(pbstring,",]");
+		writefln("Pulled option %s with value %s",ret[$-1].name,ret[$-1].value);
+	}
+	// rip off the trailing ]
+	pbstring = pbstring[1..$];
+	return ret;
+}

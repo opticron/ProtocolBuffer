@@ -11,11 +11,12 @@ struct PBChild {
 	char[]type;
 	char[]name;
 	int index;
+	char[]valdefault;
 	// this takes care of definition and accessors
 	char[]toDString(char[]indent) {
 		// XXX need to take care of defaults here once we support options XXX
 		char[]ret;
-		ret ~= indent~toDType(type)~(modifier=="repeated"?"[]":" ")~name~";\n";
+		ret ~= indent~toDType(type)~(modifier=="repeated"?"[]":" ")~name~(valdefault.length?" = "~valdefault:"")~";\n";
 		// get accessor
 		ret ~= indent~toDType(type)~(modifier=="repeated"?"[]":" ")~"get_"~name~"() {\n";
 		indent ~= "	";
@@ -64,8 +65,11 @@ struct PBChild {
 		// deal with inline options
 		pbstring = stripLWhite(pbstring);
                 if (pbstring[0] == '[') {
-			pbstring = pbstring[1..$];
-			ripOption(pbstring,']');
+			PBOption[]opts = ripOptions(pbstring);
+			foreach (opt;opts) if (opt.name == "default") {
+				if (child.modifier == "repeated") throw new PBParseException("Default Option("~child.name~" default)","Default options can not be applied to repeated fields.");
+				child.valdefault = opt.value;
+			}
 		}
 		// now, check to see if we have a semicolon so we can be done
 		pbstring = stripLWhite(pbstring);
@@ -188,7 +192,7 @@ char[]toDType(char[]intype) {
 unittest {
 	writefln("unittest ProtocolBuffer.pbchild");
 	// assumes leading whitespace has already been stripped
-	char[]childtxt = "optional int32 i32test = 1;";
+	char[]childtxt = "optional int32 i32test = 1[default=5];";
 	auto child = PBChild(childtxt);
 	debug writefln("Checking modifier...");
 	assert(child.modifier == "optional");
@@ -201,7 +205,7 @@ unittest {
 	debug writefln("Checking output...");
 	debug writefln("%s",child.toDString("	"));
 	childtxt = 
-"	int i32test;
+"	int i32test = 5;
 	int get_i32test() {
 		return i32test;
 	}

@@ -84,8 +84,7 @@ struct PBEnum {
 		pbstring = stripLWhite(pbstring);
 		// deal with inline options
 		if (pbstring[0] == '[') {
-			pbstring = pbstring[1..$];
-			ripOption(pbstring,']');
+			ripOptions(pbstring);
 		}
 		// make sure we snatch a semicolon
 		if (pbstring[0] == ';') {
