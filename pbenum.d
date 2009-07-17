@@ -9,7 +9,6 @@ import std.stdio;
 struct PBEnum {
 	char[]name;
 	char[][int]values;
-	// XXX need to support options at some point XXX
 	char[]toDString(char[]indent) {
 		char[]retstr = "";
 		retstr ~= indent~"enum "~name~" {\n";
@@ -65,6 +64,12 @@ struct PBEnum {
 		char[]tmp = stripValidChars(CClass.Identifier,pbstring);
 		if (!tmp.length) throw new PBParseException("Enum Definition("~name~")","Could not pull item name from definition.");
 		if (!validIdentifier(tmp)) throw new PBParseException("Enum Definition("~name~")","Invalid item name identifier "~tmp~".");
+		// check for options
+		if (tmp == "option") {
+			writefln("Ignoring option");
+			ripOption(pbstring);
+			return;
+		}
 		pbstring = stripLWhite(pbstring);
 		// ensure that the name doesn't already exist
 		foreach(val;values.values) if (tmp == val) throw new PBParseException("Enum Definition("~name~")","Multiply defined element("~tmp~")");
@@ -77,9 +82,18 @@ struct PBEnum {
 		if (!num.length) throw new PBParseException("Enum Definition("~name~"."~tmp~")","Could not pull numeric enum value.");
 		values[cast(int)atoi(num)] = tmp;
 		pbstring = stripLWhite(pbstring);
+		// deal with inline options
+		if (pbstring[0] == '[') {
+			pbstring = pbstring[1..$];
+			ripOption(pbstring,']');
+		}
 		// make sure we snatch a semicolon
-		if (pbstring[0] != ';') throw new PBParseException("Enum Definition("~name~"."~tmp~"="~num~")","Expected ';'.");
-		pbstring = pbstring[1..$];
+		if (pbstring[0] == ';') {
+			// we're done here
+			pbstring = pbstring[1..$];
+			return;
+		}
+		throw new PBParseException("Enum Definition("~name~"."~tmp~"="~num~")","Expected ';'.");
 	}
 }
 
