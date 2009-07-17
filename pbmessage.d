@@ -178,6 +178,11 @@ struct PBMessage {
 			case PBTypes.PB_Comment:
 				stripValidChars(CClass.Comment,pbstring);
 				break;
+			case PBTypes.PB_Option:
+				// rip of "option" and leading whitespace
+				pbstring = stripLWhite(pbstring["option".length..$]);
+				ripOption(pbstring);
+				break;
 			default:
 				throw new PBParseException("Message Definition","Only extend, service, package, and message are allowed here.");
 			}
