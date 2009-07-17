@@ -61,17 +61,20 @@ struct PBChild {
 		child.index = cast(int)atoi(tmp);
 		if (child.index <= 0) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Numeric index can not be less than 1.");
 		if (child.index > 15) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Numeric index can not be greater than 15.");
+		// deal with inline options
 		pbstring = stripLWhite(pbstring);
+                if (pbstring[0] == '[') {
+			pbstring = pbstring[1..$];
+			ripOption(pbstring,']');
+		}
 		// now, check to see if we have a semicolon so we can be done
+		pbstring = stripLWhite(pbstring);
 		if (pbstring[0] == ';') {
 			// rip off the semicolon
 			pbstring = pbstring[1..$];
 			return child;
 		}
-		// we're still here, so there may be options in []
-		if (pbstring[0] != '[') throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","No idea what to do with string after index.");
-		// XXX support options! XXX
-		throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Options are not currently supported.");
+		throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","No idea what to do with string after index and options.");
 	}
 
 	char[]genSerLine(char[]indent) {
