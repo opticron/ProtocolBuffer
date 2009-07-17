@@ -69,6 +69,8 @@ struct PBChild {
 			foreach (opt;opts) if (opt.name == "default") {
 				if (child.modifier == "repeated") throw new PBParseException("Default Option("~child.name~" default)","Default options can not be applied to repeated fields.");
 				child.valdefault = opt.value;
+			} else if (opt.name == "deprecated" && opt.value == "true") {
+				if (child.modifier == "required") throw new PBParseException("Deprecated Option("~child.name~" deprecated)","Deprecated options can not be applied to repeated fields.");
 			}
 		}
 		// now, check to see if we have a semicolon so we can be done
