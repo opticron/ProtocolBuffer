@@ -176,11 +176,11 @@ PBOption ripOption(inout char[]pbstring,char terminator = ';') {
 		pbopt.extension = true;
 		pbstring = pbstring[1..$];
 	}
-	stripLWhite(pbstring);
+	pbstring = stripLWhite(pbstring);
 	pbopt.name = stripValidChars(CClass.MultiIdentifier,pbstring);
 	if (!pbopt.name.length) throw new PBParseException("Option Parse","Malformed option: Option name not found.");
 	if (pbopt.extension) {
-		stripLWhite(pbstring);
+		pbstring = stripLWhite(pbstring);
 		// rip off trailing )
 		pbstring = pbstring[1..$];
 		// check for more portions of the identifier
@@ -191,11 +191,11 @@ PBOption ripOption(inout char[]pbstring,char terminator = ';') {
 			pbopt.name = stripValidChars(CClass.MultiIdentifier,pbstring);
 		}
 	}
-	stripLWhite(pbstring);
+	pbstring = stripLWhite(pbstring);
 	// expect next char must be =
 	if (pbstring[0] != '=') throw new PBParseException("Option Parse("~pbopt.name~")","Malformed option: Missing = after option name.");
 	pbstring = pbstring[1..$];
-	stripLWhite(pbstring);
+	pbstring = stripLWhite(pbstring);
 	// the remaining text between here and the terminator is our value
 	// XXX this string pulling code is buggy
 	char tmpterm = terminator;

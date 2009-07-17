@@ -264,7 +264,7 @@ byte[]ripUField(inout byte[]input,byte wiretype) {
 	case 2:
 		// snag a length delimited chunk
 		auto blen = fromVarint!(long)(input);
-		byte[]tmp = input[0..blen];
+		byte[]tmp = input[0..cast(uint)blen];
 		return toVarint(blen,cast(byte)0)[1..$]~tmp;
 	case 5:
 		// snag a 32bit chunk
@@ -275,4 +275,5 @@ byte[]ripUField(inout byte[]input,byte wiretype) {
 		// shit is broken....
 		throw new Exception("Can't deal with wiretype "~toString(wiretype));
 	}
+	throw new Exception("Wiretype "~toString(wiretype)~" fell through switch");
 }
