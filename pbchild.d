@@ -12,19 +12,20 @@ struct PBChild {
 	char[]name;
 	int index;
 	char[]valdefault;
+	bool is_dep = false;
 	// this takes care of definition and accessors
 	char[]toDString(char[]indent) {
 		// XXX need to take care of defaults here once we support options XXX
 		char[]ret;
-		ret ~= indent~toDType(type)~(modifier=="repeated"?"[]":" ")~name~(valdefault.length?" = "~valdefault:"")~";\n";
+		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~name~(valdefault.length?" = "~valdefault:"")~";\n";
 		// get accessor
-		ret ~= indent~toDType(type)~(modifier=="repeated"?"[]":" ")~"get_"~name~"() {\n";
+		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~"get_"~name~"() {\n";
 		indent ~= "	";
 		ret ~= indent~"return "~name~";\n";
 		indent = indent[0..$-1];
 		ret ~= indent~"}\n";
 		// set accessor
-		ret ~= indent~"void set_"~name~"("~toDType(type)~(modifier=="repeated"?"[]":" ")~"input_var) {\n";
+		ret ~= indent~(is_dep?"deprecated ":"")~"void set_"~name~"("~toDType(type)~(modifier=="repeated"?"[]":" ")~"input_var) {\n";
 		indent ~= "	";
 		ret ~= indent~name~" = input_var;\n";
 		indent = indent[0..$-1];
@@ -71,6 +72,7 @@ struct PBChild {
 				child.valdefault = opt.value;
 			} else if (opt.name == "deprecated" && opt.value == "true") {
 				if (child.modifier == "required") throw new PBParseException("Deprecated Option("~child.name~" deprecated)","Deprecated options can not be applied to repeated fields.");
+				child.is_dep = true;
 			}
 		}
 		// now, check to see if we have a semicolon so we can be done
