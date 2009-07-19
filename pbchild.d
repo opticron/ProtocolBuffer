@@ -162,7 +162,7 @@ struct PBChild {
 		// check header byte with case since we're guaranteed to be in a switch
 		ret ~= indent~"case "~toString(index)~":\n";
 		indent ~= "	";
-		// common code!
+		// check the header vs the type
 		char[]pack;
 		if (isPackable(type) && modifier == "repeated") {
 			ret ~= indent~"if (getWireType(header) != 2) {\n";
@@ -172,15 +172,15 @@ struct PBChild {
 		switch(type) {
 		case "float","double","sfixed32","sfixed64","fixed32","fixed64":
 			pack = "fromByteBlob!("~toDType(type)~")";
-			ret ~= "fromByteBlob!("~toDType(type)~")(input);\n";
+			ret ~= pack~"(input);\n";
 			break;
 		case "bool","int32","int64","uint32","uint64":
 			pack = "fromVarint!("~toDType(type)~")";
-			ret ~= "fromVarint!("~toDType(type)~")(input);\n";
+			ret ~= pack~"(input);\n";
 			break;
 		case "sint32","sint64":
 			pack = "fromSInt!("~toDType(type)~")";
-			ret ~= "fromSInt!("~toDType(type)~")(input);\n";
+			ret ~= pack~"(input);\n";
 			break;
 		case "string","bytes":
 			// no need to worry about packedness here, since it can't be
@@ -281,11 +281,25 @@ unittest {
 }
 
 bool isPackable(char[]type) {
-	switch(type) {
-	case "float","double","sfixed32","sfixed64","fixed32","fixed64","bool","int32","int64","uint32","uint64","sint32","sint64":
+	byte wt = wTFromType(type);
+	if (wt == 0 || wt == 1 || wt == 5) {
 		return true;
-	default:
-		return false;
 	}
 	return false;
+}
+
+byte wTFromType(char[]type) {
+	switch(type) {
+	case "float","sfixed32","fixed32":
+		return cast(byte)5;
+	case "double","sfixed64","fixed64":
+		return cast(byte)1;
+	case "bool","int32","int64","uint32","uint64","sint32","sint64":
+		return cast(byte)0;
+	case "string","bytes":
+		return cast(byte)2;
+	default:
+		return cast(byte)-1;
+	}
+	return cast(byte)-1;
 }
