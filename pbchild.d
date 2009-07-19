@@ -16,20 +16,15 @@ struct PBChild {
 	bool is_dep = false;
 	// this takes care of definition and accessors
 	char[]toDString(char[]indent) {
-		// XXX need to take care of defaults here once we support options XXX
 		char[]ret;
-		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~name~(valdefault.length?" = "~valdefault:"")~";\n";
+		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]_":" _")~name~(valdefault.length?" = "~valdefault:"")~";\n";
 		// get accessor
-		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~"get_"~name~"() {\n";
-		indent ~= "	";
-		ret ~= indent~"return "~name~";\n";
-		indent = indent[0..$-1];
+		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~name~"() {\n";
+		ret ~= indent~"	return _"~name~";\n";
 		ret ~= indent~"}\n";
 		// set accessor
-		ret ~= indent~(is_dep?"deprecated ":"")~"void set_"~name~"("~toDType(type)~(modifier=="repeated"?"[]":" ")~"input_var) {\n";
-		indent ~= "	";
-		ret ~= indent~name~" = input_var;\n";
-		indent = indent[0..$-1];
+		ret ~= indent~(is_dep?"deprecated ":"")~"void "~name~"("~toDType(type)~(modifier=="repeated"?"[]":" ")~"input_var) {\n";
+		ret ~= indent~"	_"~name~" = input_var;\n";
 		ret ~= indent~"}\n";
 		return ret;
 	}
@@ -168,7 +163,7 @@ struct PBChild {
 			ret ~= indent~"if (getWireType(header) != 2) {\n";
 			indent ~= "	";
 		}
-		ret ~= indent~"retobj."~name~" "~(modifier=="repeated"?"~":"")~"= ";
+		ret ~= indent~"retobj._"~name~" "~(modifier=="repeated"?"~":"")~"= ";
 		switch(type) {
 		case "float","double","sfixed32","sfixed64","fixed32","fixed64":
 			pack = "fromByteBlob!("~toDType(type)~")";
@@ -192,17 +187,17 @@ struct PBChild {
 			ret = indent~"case "~toString(index)~":\n";
 			ret ~= indent~"static if (is("~type~":Object)) {\n";
 			// no need to worry about packedness here, since it can't be
-			ret ~= indent~"	retobj."~name~" = "~type~".Deserialize(input,false);\n";
+			ret ~= indent~"	retobj._"~name~" = "~type~".Deserialize(input,false);\n";
 			ret ~= indent~"} else {\n";
 			ret ~= indent~"	// this is an enum, almost certainly\n";
 			// worry about packedness here
 			if (modifier == "repeated") {
 				ret ~= indent~"if (getWireType(header) != 2) {\n";
 			}
-			ret ~= indent~(modifier=="repeated"?"	":"")~"	retobj."~name~" "~(modifier=="repeated"?"~":"")~"= fromVarint!(int)(input);\n";
+			ret ~= indent~(modifier=="repeated"?"	":"")~"	retobj._"~name~" "~(modifier=="repeated"?"~":"")~"= fromVarint!(int)(input);\n";
 			if (modifier == "repeated") {
 				ret ~= indent~"	} else {\n";
-				ret ~= indent~"		retobj."~name~" ~= fromPacked!("~toDType(type)~","~pack~")(input);\n";
+				ret ~= indent~"		retobj._"~name~" ~= fromPacked!("~toDType(type)~","~pack~")(input);\n";
 				ret ~= indent~"	}\n";
 			}
 			ret ~= indent~"}\n";
@@ -211,7 +206,7 @@ struct PBChild {
 		if (modifier == "repeated" && isPackable(type)) {
 			indent = indent[0..$-1];
 			ret ~= indent~"} else {\n";
-			ret ~= indent~"	retobj."~name~" ~= fromPacked!("~toDType(type)~","~pack~")(input);\n";
+			ret ~= indent~"	retobj._"~name~" ~= fromPacked!("~toDType(type)~","~pack~")(input);\n";
 			ret ~= indent~"}\n";
 		}
 		if (modifier == "required") {
@@ -268,12 +263,12 @@ unittest {
 	debug writefln("Checking output...");
 	debug writefln("%s",child.toDString("	"));
 	childtxt = 
-"	int i32test = 5;
-	int get_i32test() {
-		return i32test;
+"	int _i32test = 5;
+	int i32test() {
+		return _i32test;
 	}
-	void set_i32test(int input_var) {
-		i32test = input_var;
+	void i32test(int input_var) {
+		_i32test = input_var;
 	}
 ";
 	assert(child.toDString("	") == childtxt);
