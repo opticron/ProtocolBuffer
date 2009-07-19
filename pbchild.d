@@ -12,6 +12,7 @@ struct PBChild {
 	char[]name;
 	int index;
 	char[]valdefault;
+	bool packed = false;
 	bool is_dep = false;
 	// this takes care of definition and accessors
 	char[]toDString(char[]indent) {
@@ -73,6 +74,11 @@ struct PBChild {
 			} else if (opt.name == "deprecated" && opt.value == "true") {
 				if (child.modifier == "required") throw new PBParseException("Deprecated Option("~child.name~" deprecated)","Deprecated options can not be applied to repeated fields.");
 				child.is_dep = true;
+			} else if (opt.name == "packed" && opt.value == "true") {
+				if (child.modifier == "required" || child.modifier == "optional") throw new PBParseException("Packed Option("~child.name~" packed)","Packed options can not be applied to "~child.modifier~" fields.");
+				if (child.type == "string" || child.type == "bytes") throw new PBParseException("Packed Option("~child.name~" packed)","Packed options can not be applied to "~child.type~" types.");
+				// XXX applying packed to message types is not properly checked, but is avoided in deser code
+				child.packed = true;
 			}
 		}
 		// now, check to see if we have a semicolon so we can be done
@@ -88,35 +94,63 @@ struct PBChild {
 	char[]genSerLine(char[]indent) {
 		char[]tname = name;
 		char[]ret;
-		if (modifier == "repeated") {
+		if (modifier == "repeated" && !packed) {
 			ret ~= indent~"foreach(iter;"~name~") {\n";
 			tname = "iter";
 			indent ~= "	";
 		}
+		char[]func;
 		switch(type) {
 		case "float","double","sfixed32","sfixed64","fixed32","fixed64":
-			ret ~= indent~"ret ~= toByteBlob("~tname~",cast(byte)"~toString(index)~");\n";
+			func = "toByteBlob";
 			break;
 		case "bool","int32","int64","uint32","uint64":
-			ret ~= indent~"ret ~= toVarint("~tname~",cast(byte)"~toString(index)~");\n";
+			func = "toVarint";
 			break;
 		case "sint32","sint64":
-			ret ~= indent~"ret ~= toSInt("~tname~",cast(byte)"~toString(index)~");\n";
+			func = "toSInt";
 			break;
 		case "string","bytes":
-			ret ~= indent~"ret ~= toByteString("~tname~",cast(byte)"~toString(index)~");\n";
+			// the checks ensure that these can never be packed
+			func = "toByteString";
 			break;
 		default:
 			// this covers defined messages and enums
-			ret ~= indent~"static if (is("~type~":Object)) {\n";
-			ret ~= indent~"	ret ~= "~tname~".Serialize(cast(byte)"~toString(index)~");\n";
-			ret ~= indent~"} else {\n";
-			ret ~= indent~"	// this is an enum, almost certainly\n";
-			ret ~= indent~"	ret ~= toVarint!(int)("~tname~",cast(byte)"~toString(index)~");\n";
-			ret ~= indent~"}\n";
+			func = "toVarint!(int)";
 			break;
 		}
-		if (modifier == "repeated") {
+		// we have to have some specialized code to deal with enums vs user-defined classes, since they are both detected the same
+		if (func == "toVarint!(int)") {
+			ret ~= indent~"static if (is("~type~":Object)) {\n";
+			// packed only works for primitive types, so take care of normal repeated serialization here
+			// since we can't easily detect this without decent type resolution in the .proto parser
+			if (modifier == "repeated" && packed) {
+				ret ~= indent~"foreach(iter;"~name~") {\n";
+				indent ~= "	";
+			}
+			ret ~= indent~"	ret ~= "~(packed?"iter":tname)~".Serialize(cast(byte)"~toString(index)~");\n";
+			if (modifier == "repeated" && packed) {
+				indent = indent[0..$-1];
+				ret ~= indent~"}\n";
+			}
+			// done taking care of unpackable classes
+			ret ~= indent~"} else {\n";
+			indent ~= "	";
+			ret ~= indent~"// this is an enum, almost certainly\n";
+		}
+		// take care of packed circumstances
+		if (modifier == "repeated" && packed) {
+			ret ~= indent~"ret ~= toPacked!("~toDType(type)~","~func~")";
+		} else {
+			ret ~= indent~"ret ~= "~func;
+		}
+		// finish off the parameters, because they're the same for packed or not
+		ret ~= "("~tname~",cast(byte)"~toString(index)~");\n";
+		if (func == "toVarint!(int)") {
+			indent = indent[0..$-1];
+			ret ~= indent~"}\n";
+		}
+		if (modifier == "repeated" && !packed) {
 			indent = indent[0..$-1];
 			ret ~= indent~"}\n";
 		}
@@ -129,18 +163,27 @@ struct PBChild {
 		ret ~= indent~"case "~toString(index)~":\n";
 		indent ~= "	";
 		// common code!
+		char[]pack;
+		if (isPackable(type) && modifier == "repeated") {
+			ret ~= indent~"if (getWireType(header) != 2) {\n";
+			indent ~= "	";
+		}
 		ret ~= indent~"retobj."~name~" "~(modifier=="repeated"?"~":"")~"= ";
 		switch(type) {
 		case "float","double","sfixed32","sfixed64","fixed32","fixed64":
+			pack = "fromByteBlob!("~toDType(type)~")";
 			ret ~= "fromByteBlob!("~toDType(type)~")(input);\n";
 			break;
 		case "bool","int32","int64","uint32","uint64":
+			pack = "fromVarint!("~toDType(type)~")";
 			ret ~= "fromVarint!("~toDType(type)~")(input);\n";
 			break;
 		case "sint32","sint64":
+			pack = "fromSInt!("~toDType(type)~")";
 			ret ~= "fromSInt!("~toDType(type)~")(input);\n";
 			break;
 		case "string","bytes":
+			// no need to worry about packedness here, since it can't be
 			ret ~= "fromByteString!("~toDType(type)~")(input);\n";
 			break;
 		default:
@@ -148,12 +191,28 @@ struct PBChild {
 			// also, make sure we don't think we're root
 			ret = indent~"case "~toString(index)~":\n";
 			ret ~= indent~"static if (is("~type~":Object)) {\n";
+			// no need to worry about packedness here, since it can't be
 			ret ~= indent~"	retobj."~name~" = "~type~".Deserialize(input,false);\n";
 			ret ~= indent~"} else {\n";
 			ret ~= indent~"	// this is an enum, almost certainly\n";
-			ret ~= indent~"	retobj."~name~" = fromVarint!(int)(input);\n";
+			// worry about packedness here
+			if (modifier == "repeated") {
+				ret ~= indent~"if (getWireType(header) != 2) {\n";
+			}
+			ret ~= indent~(modifier=="repeated"?"	":"")~"	retobj."~name~" "~(modifier=="repeated"?"~":"")~"= fromVarint!(int)(input);\n";
+			if (modifier == "repeated") {
+				ret ~= indent~"	} else {\n";
+				ret ~= indent~"		retobj."~name~" ~= fromPacked!("~toDType(type)~","~pack~")(input);\n";
+				ret ~= indent~"	}\n";
+			}
 			ret ~= indent~"}\n";
 			break;
+		}
+		if (modifier == "repeated" && isPackable(type)) {
+			indent = indent[0..$-1];
+			ret ~= indent~"} else {\n";
+			ret ~= indent~"	retobj."~name~" ~= fromPacked!("~toDType(type)~","~pack~")(input);\n";
+			ret ~= indent~"}\n";
 		}
 		if (modifier == "required") {
 			ret ~= indent~"_"~name~"_check = true;\n";
@@ -221,3 +280,12 @@ unittest {
 	debug writefln("");
 }
 
+bool isPackable(char[]type) {
+	switch(type) {
+	case "float","double","sfixed32","sfixed64","fixed32","fixed64","bool","int32","int64","uint32","uint64","sint32","sint64":
+		return true;
+	default:
+		return false;
+	}
+	return false;
+}

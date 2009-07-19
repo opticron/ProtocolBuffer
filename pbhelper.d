@@ -277,3 +277,48 @@ byte[]ripUField(inout byte[]input,byte wiretype) {
 	}
 	throw new Exception("Wiretype "~toString(wiretype)~" fell through switch");
 }
+
+// handle packed fields
+byte[]toPacked(T:T[],alias serializer)(T[]packed,byte field) {
+	// zero length packed repeated fields serialize to nothing
+	if (!packed.length) return null;
+	byte[]ret;
+	foreach(pack;packed) {
+		// serialize everything, but leave off the header bytes for all of them
+		ret ~= serializer(pack,field)[1..$];
+	}
+	// now that everything is serialized, grab the length, convert to varint, and tack on a header
+	ret = [genHeader(field,cast(byte)2)]~toVarint(ret.length,field)[1..$]~ret;
+	return ret;
+}
+
+T[]fromPacked(T,alias deserializer)(inout byte[]input) {
+	T[]ret;
+	// it's assumed that the field is already ripped off
+	// grab the length to be decoded
+	auto len = fromVarint!(uint)(input);
+	if (input.length < len) throw new Exception("A repeated packed field specifies a length longer than available data.");
+	// rip off the chunk that's ours and process the hell out of it
+	byte[]own = input[0..len];
+	input = input[len..$];
+	while(own.length) {
+		ret ~= deserializer(own);
+	}
+	return ret;
+}
+
+unittest {
+	writefln("unittest ProtocolBuffer.pbhelper.packed_fields");
+	int[]test = [3,270,86942];
+	byte[]cmp = cast(byte[])[0x22,0x6,0x3,0x8e,0x2,0x9e,0xa7,0x5];
+	byte[]tmp = toPacked!(int[],toVarint)(test,cast(byte)4);
+	assert(tmp.length == 8);
+	debug writefln("%x",cmp);
+	debug writefln("%x",tmp);
+	assert(tmp == cmp);
+	// rip off header byte
+	tmp = tmp[1..$];
+	int[]test2 = fromPacked!(int,fromVarint!(int))(tmp);
+	assert(test == test2);
+	debug writefln("");
+}
