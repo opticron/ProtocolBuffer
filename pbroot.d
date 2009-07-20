@@ -11,6 +11,7 @@ import std.stdio;
 struct PBRoot {
 	PBMessage[]message_defs;
 	PBEnum[]enum_defs;
+	char[][]imports;
 	// this package name should translate directly to the module name of the implementation file
 	// but I might want to mix everything in without a separate compiler...or make it available both ways
 	char[]Package;
@@ -18,7 +19,6 @@ struct PBRoot {
 	// XXX need to support imports here (this will require an array of pbroots) XXX
 	char[]toDString(char[]indent="") {
 		char[]retstr = "";
-		retstr ~= "module "~Package~";\n";
 		retstr ~= "import ProtocolBuffer.pbhelper;\n";
 		// write out enums
 		foreach(pbenum;enum_defs) {
@@ -59,8 +59,15 @@ struct PBRoot {
 				pbstring = stripLWhite(pbstring["option".length..$]);
 				ripOption(pbstring);
 				break;
+			case PBTypes.PB_Import:
+				pbstring = pbstring["import".length..$];
+				pbstring = stripLWhite(pbstring);
+				if (pbstring[0] != '"') throw new PBParseException("Root Definition("~root.Package~")","Imports must be quoted");
+				// save imports for use by the compiler code
+				root.imports ~= ripQuotedValue(pbstring)[1..$-1];
+				break;
 			default:
-				throw new PBParseException("Root Definition("~root.Package~")","Either there's a definition here that isn't supported, or the definition isn't allowed here.");
+				throw new PBParseException("Root Definition("~root.Package~")","Either there's a definition here that isn't supported, or the definition isn't allowed here");
 			}
 			// rip off whitespace before looking for the next definition
 			pbstring = stripLWhite(pbstring);

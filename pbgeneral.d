@@ -74,10 +74,12 @@ in {
 	case "optional":
 		return PBTypes.PB_Optional;
 	case "option":
+		return PBTypes.PB_Option;
+	case "import":
+		return PBTypes.PB_Import;
 	case "extension":
 	case "extend":
 	case "service":
-	case "import":
 		throw new PBParseException("Protocol Buffer Definition",capitalize(type)~" definitions are not currently supported.");
 	default:
 		throw new PBParseException("Protocol Buffer Definition","Unknown element type "~type~".");

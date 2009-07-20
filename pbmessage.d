@@ -197,7 +197,118 @@ struct PBMessage {
 
 unittest {
 	char[]instring = "message glorm{\noptional int32 i32test = 1;\nmessage simple { }\noptional simple quack = 5;\n}\n";
-	char[]compstr = "class glorm {\n	class simple {\n	}\n	int i32test;\n	simple quack;\n}\n";
+	char[]compstr = 
+"class glorm {
+	// deal with unknown fields
+	byte[]ufields;
+	static class simple {
+		// deal with unknown fields
+		byte[]ufields;
+		byte[]Serialize(byte field = 16) {
+			byte[]ret;
+			ret ~= ufields;
+			// take care of header and length generation if necessary
+			if (field != 16) {
+				ret = genHeader(field,2)~toVarint(ret.length,field)[1..$]~ret;
+			}
+			return ret;
+		}
+		// if we're root, we can assume we own the whole string
+		// if not, the first thing we need to do is pull the length that belongs to us
+		static simple Deserialize(inout byte[]manip,bool isroot=true) {
+			auto retobj = new simple;
+			byte[]input = manip;
+			// cut apart the input string
+			if (!isroot) {
+				uint len = fromVarint!(uint)(manip);
+				input = manip[0..len];
+				manip = manip[len..$];
+			}
+			while(input.length) {
+				byte header = input[0];
+				input = input[1..$];
+				switch(getFieldNumber(header)) {
+				default:
+					// rip off unknown fields
+					retobj.ufields ~= header~ripUField(input,getWireType(header));
+					break;
+				}
+			}
+			return retobj;
+		}
+		static simple opCall(inout byte[]input) {
+			return Deserialize(input);
+		}
+	}
+	int _i32test;
+	int i32test() {
+		return _i32test;
+	}
+	void i32test(int input_var) {
+		_i32test = input_var;
+	}
+	simple _quack;
+	simple quack() {
+		return _quack;
+	}
+	void quack(simple input_var) {
+		_quack = input_var;
+	}
+	byte[]Serialize(byte field = 16) {
+		byte[]ret;
+		ret ~= toVarint(i32test,cast(byte)1);
+		static if (is(simple:Object)) {
+			ret ~= quack.Serialize(cast(byte)5);
+		} else {
+			// this is an enum, almost certainly
+			ret ~= toVarint!(int)(quack,cast(byte)5);
+		}
+		ret ~= ufields;
+		// take care of header and length generation if necessary
+		if (field != 16) {
+			ret = genHeader(field,2)~toVarint(ret.length,field)[1..$]~ret;
+		}
+		return ret;
+	}
+	// if we're root, we can assume we own the whole string
+	// if not, the first thing we need to do is pull the length that belongs to us
+	static glorm Deserialize(inout byte[]manip,bool isroot=true) {
+		auto retobj = new glorm;
+		byte[]input = manip;
+		// cut apart the input string
+		if (!isroot) {
+			uint len = fromVarint!(uint)(manip);
+			input = manip[0..len];
+			manip = manip[len..$];
+		}
+		while(input.length) {
+			byte header = input[0];
+			input = input[1..$];
+			switch(getFieldNumber(header)) {
+			case 1:
+				retobj._i32test = fromVarint!(int)(input);
+				break;
+				case 5:
+				static if (is(simple:Object)) {
+					retobj._quack = simple.Deserialize(input,false);
+				} else {
+					// this is an enum, almost certainly
+					retobj._quack = fromVarint!(int)(input);
+				}
+				break;
+			default:
+				// rip off unknown fields
+				retobj.ufields ~= header~ripUField(input,getWireType(header));
+				break;
+			}
+		}
+		return retobj;
+	}
+	static glorm opCall(inout byte[]input) {
+		return Deserialize(input);
+	}
+}
+";
 	writefln("unittest ProtocolBuffer.pbmessage");
 	auto msg = PBMessage(instring);
 	debug {
