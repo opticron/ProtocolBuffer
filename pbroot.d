@@ -65,6 +65,11 @@ struct PBRoot {
 				if (pbstring[0] != '"') throw new PBParseException("Root Definition("~root.Package~")","Imports must be quoted");
 				// save imports for use by the compiler code
 				root.imports ~= ripQuotedValue(pbstring)[1..$-1];
+				// ensure that the ; is removed
+				pbstring = stripLWhite(pbstring);
+				if (pbstring[0] != ';') throw new PBParseException("Root Definition("~root.Package~")","Missing ; after import \""~root.imports[$-1]~"\"");
+				pbstring = pbstring[1..$];
+				pbstring = stripLWhite(pbstring);
 				break;
 			default:
 				throw new PBParseException("Root Definition("~root.Package~")","Either there's a definition here that isn't supported, or the definition isn't allowed here");
