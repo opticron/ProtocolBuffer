@@ -44,6 +44,8 @@ struct PBMessage {
 		// here is where we add the code to serialize and deserialize
 		retstr ~= genSerCode(indent);
 		retstr ~= genDesCode(indent);
+		// define merging function
+		retstr ~= genMergeCode(indent);
 		// include a static opcall to do deserialization to make coding simpler
 		retstr ~= indent~"static "~name~" opCall(inout byte[]input) {\n";
 		retstr ~= indent~"	return Deserialize(input);\n";
@@ -193,6 +195,20 @@ struct PBMessage {
 		pbstring = pbstring[1..$];
 		return message;
 	}
+
+	char[]genMergeCode(char[]indent) {
+		char[]ret;
+		ret ~= indent~"void MergeFrom("~name~" merger) {\n";
+		indent = indent~"	";
+		// merge code
+		// XXX needs to take into account accessor functions once written (has_var)
+		foreach(pbchild;children) {
+			ret ~= indent~pbchild.name~" "~(pbchild.modifier == "repeated"?"~":"")~"= merger."~pbchild.name~";\n";
+		}
+		indent = indent[0..$-1];
+		ret ~= indent~"}\n";
+		return ret;
+	}
 }
 
 unittest {
@@ -235,6 +251,8 @@ unittest {
 				}
 			}
 			return retobj;
+		}
+		void MergeFrom(simple merger) {
 		}
 		static simple opCall(inout byte[]input) {
 			return Deserialize(input);
@@ -303,6 +321,10 @@ unittest {
 			}
 		}
 		return retobj;
+	}
+	void MergeFrom(glorm merger) {
+		i32test = merger.i32test;
+		quack = merger.quack;
 	}
 	static glorm opCall(inout byte[]input) {
 		return Deserialize(input);
