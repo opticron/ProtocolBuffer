@@ -196,7 +196,6 @@ struct PBMessage {
 		ret ~= indent~"void MergeFrom("~name~" merger) {\n";
 		indent = indent~"	";
 		// merge code
-		// XXX needs to take into account accessor functions once written (has_var)
 		foreach(pbchild;children) if (pbchild.modifier != "repeated") {
 			ret ~= indent~"if (merger.has_"~pbchild.name~") "~pbchild.name~" = merger."~pbchild.name~";\n";
 		} else {

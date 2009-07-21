@@ -16,7 +16,6 @@ struct PBRoot {
 	// but I might want to mix everything in without a separate compiler...or make it available both ways
 	char[]Package;
 	// XXX need to support extensions here XXX
-	// XXX need to support imports here (this will require an array of pbroots) XXX
 	char[]toDString(char[]indent="") {
 		char[]retstr = "";
 		retstr ~= "import ProtocolBuffer.pbhelper;\n";
