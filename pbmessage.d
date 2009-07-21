@@ -103,11 +103,6 @@ struct PBMessage {
 		indent = indent[0..$-1];
 		ret ~= indent~"}\n";
 
-		// required variable checks go here
-		foreach(pbchild;children) if (pbchild.modifier == "required") {
-			ret ~= indent~"bool _"~pbchild.name~"_check = false;\n";
-		}
-
 		// deserialization code goes here
 		ret ~= indent~"while(input.length) {\n";
 		indent = indent~"	";
@@ -129,7 +124,7 @@ struct PBMessage {
 
 		// check for required  fields
 		foreach(pbchild;children) if (pbchild.modifier == "required") {
-			ret ~= indent~"if (_"~pbchild.name~"_check == false) throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n";
+			ret ~= indent~"if (retobj._has_"~pbchild.name~" == false) throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n";
 		}
 		ret ~= indent~"return retobj;\n";
 		indent = indent[0..$-1];
@@ -202,8 +197,10 @@ struct PBMessage {
 		indent = indent~"	";
 		// merge code
 		// XXX needs to take into account accessor functions once written (has_var)
-		foreach(pbchild;children) {
-			ret ~= indent~pbchild.name~" "~(pbchild.modifier == "repeated"?"~":"")~"= merger."~pbchild.name~";\n";
+		foreach(pbchild;children) if (pbchild.modifier != "repeated") {
+			ret ~= indent~"if (merger.has_"~pbchild.name~") "~pbchild.name~" = merger."~pbchild.name~";\n";
+		} else {
+			ret ~= indent~"if (merger.has_"~pbchild.name~") add_"~pbchild.name~"(merger."~pbchild.name~");\n";
 		}
 		indent = indent[0..$-1];
 		ret ~= indent~"}\n";
@@ -264,6 +261,14 @@ unittest {
 	}
 	void i32test(int input_var) {
 		_i32test = input_var;
+		_has_i32test = true;
+	}
+	bool _has_i32test = false;
+	bool has_i32test () {
+		return _has_i32test;
+	}
+	void clear_i32test () {
+		_has_i32test = false;
 	}
 	simple _quack;
 	simple quack() {
@@ -271,6 +276,14 @@ unittest {
 	}
 	void quack(simple input_var) {
 		_quack = input_var;
+		_has_quack = true;
+	}
+	bool _has_quack = false;
+	bool has_quack () {
+		return _has_quack;
+	}
+	void clear_quack () {
+		_has_quack = false;
 	}
 	byte[]Serialize(byte field = 16) {
 		byte[]ret;
@@ -305,6 +318,7 @@ unittest {
 			switch(getFieldNumber(header)) {
 			case 1:
 				retobj._i32test = fromVarint!(int)(input);
+				retobj._has_i32test = true;
 				break;
 				case 5:
 				static if (is(simple:Object)) {
@@ -313,6 +327,7 @@ unittest {
 					// this is an enum, almost certainly
 					retobj._quack = fromVarint!(int)(input);
 				}
+				retobj._has_quack = true;
 				break;
 			default:
 				// rip off unknown fields
@@ -323,8 +338,8 @@ unittest {
 		return retobj;
 	}
 	void MergeFrom(glorm merger) {
-		i32test = merger.i32test;
-		quack = merger.quack;
+		if (merger.has_i32test) i32test = merger.i32test;
+		if (merger.has_quack) quack = merger.quack;
 	}
 	static glorm opCall(inout byte[]input) {
 		return Deserialize(input);

@@ -25,7 +25,36 @@ struct PBChild {
 		// set accessor
 		ret ~= indent~(is_dep?"deprecated ":"")~"void "~name~"("~toDType(type)~(modifier=="repeated"?"[]":" ")~"input_var) {\n";
 		ret ~= indent~"	_"~name~" = input_var;\n";
+		if (modifier != "repeated") ret ~= indent~"	_has_"~name~" = true;\n";
 		ret ~= indent~"}\n";
+		if (modifier == "repeated") {
+			ret ~= indent~"bool has_"~name~" () {\n";
+			ret ~= indent~"	return _"~name~".length?1:0;\n";
+			ret ~= indent~"}\n";
+			ret ~= indent~"void clear_"~name~" () {\n";
+			ret ~= indent~"	_"~name~" = null;\n";
+			ret ~= indent~"}\n";
+			// technically, they can just do class.item.length
+			// there is no need for this
+			ret ~= indent~"int "~name~"_size () {\n";
+			ret ~= indent~"	return _"~name~".length;\n";
+			ret ~= indent~"}\n";
+			// functions to do additions, both singular and array
+			ret ~= indent~"void add_"~name~" ("~toDType(type)~" __addme) {\n";
+			ret ~= indent~"	_"~name~" ~= __addme;\n";
+			ret ~= indent~"}\n";
+			ret ~= indent~"void add_"~name~" ("~toDType(type)~"[]__addme) {\n";
+			ret ~= indent~"	_"~name~" ~= __addme;\n";
+			ret ~= indent~"}\n";
+		} else {
+			ret ~= indent~"bool _has_"~name~" = false;\n";
+			ret ~= indent~"bool has_"~name~" () {\n";
+			ret ~= indent~"	return _has_"~name~";\n";
+			ret ~= indent~"}\n";
+			ret ~= indent~"void clear_"~name~" () {\n";
+			ret ~= indent~"	_has_"~name~" = false;\n";
+			ret ~= indent~"}\n";
+		}
 		return ret;
 	}
 
@@ -209,8 +238,9 @@ struct PBChild {
 			ret ~= indent~"	retobj._"~name~" ~= fromPacked!("~toDType(type)~","~pack~")(input);\n";
 			ret ~= indent~"}\n";
 		}
-		if (modifier == "required") {
-			ret ~= indent~"_"~name~"_check = true;\n";
+		// we need to modify this for both required and optional, repeated is taken care of
+		if (modifier != "repeated") {
+			ret ~= indent~"retobj._has_"~name~" = true;\n";
 		}
 		// tack on the break so we don't have fallthrough
 		ret ~= indent~"break;\n";
@@ -269,6 +299,14 @@ unittest {
 	}
 	void i32test(int input_var) {
 		_i32test = input_var;
+		_has_i32test = true;
+	}
+	bool _has_i32test = false;
+	bool has_i32test () {
+		return _has_i32test;
+	}
+	void clear_i32test () {
+		_has_i32test = false;
 	}
 ";
 	assert(child.toDString("	") == childtxt);

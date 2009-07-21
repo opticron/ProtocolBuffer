@@ -106,8 +106,279 @@ struct PBRoot {
 
 
 unittest {
-	char[]pbstr = "   \npackage myfirstpackage;\n// my comments hopefully won't explode anything\n   message Person {required string name= 1;\n  required int32 id =2;\n  optional string email = 3 ;\n\n  enum PhoneType{\n    MOBILE= 0;HOME =1;\n    // gotta make sure comments work everywhere\n    WORK=2 ;}\n\n  message PhoneNumber {\n    required string number = 1;\n    //woah, comments in a sub-definition  \n    optional PhoneType type = 2 ;\n  }\n\n  repeated PhoneNumber phone = 4;\n}\n//especially here    \n";
-	char[]compstr = "module myfirstpackage;\nclass Person {\n	enum PhoneType {\n		MOBILE = 0,\n		HOME = 1,\n		WORK = 2,\n	}\n	class PhoneNumber {\n		char[] number;\n		PhoneType type;\n	}\n	char[] name;\n	int id;\n	char[] email;\n	PhoneNumber phone;\n}\n";
+	char[]pbstr = "   
+package myfirstpackage;
+// my comments hopefully won't explode anything
+	message Person {required string name= 1;
+	required int32 id =2;
+	optional string email = 3 ;
+
+	enum PhoneType{
+	MOBILE= 0;HOME =1;
+	// gotta make sure comments work everywhere
+	WORK=2 ;}
+
+	message PhoneNumber {
+	required string number = 1;
+	//woah, comments in a sub-definition  
+	optional PhoneType type = 2 ;
+	}
+
+	repeated PhoneNumber phone = 4;
+}
+//especially here    
+";
+	char[]compstr = 
+"import ProtocolBuffer.pbhelper;
+class Person {
+	// deal with unknown fields
+	byte[]ufields;
+	enum PhoneType {
+		MOBILE = 0,
+		HOME = 1,
+		WORK = 2,
+	}
+	static class PhoneNumber {
+		// deal with unknown fields
+		byte[]ufields;
+		char[] _number;
+		char[] number() {
+			return _number;
+		}
+		void number(char[] input_var) {
+			_number = input_var;
+			_has_number = true;
+		}
+		bool _has_number = false;
+		bool has_number () {
+			return _has_number;
+		}
+		void clear_number () {
+			_has_number = false;
+		}
+		PhoneType _type;
+		PhoneType type() {
+			return _type;
+		}
+		void type(PhoneType input_var) {
+			_type = input_var;
+			_has_type = true;
+		}
+		bool _has_type = false;
+		bool has_type () {
+			return _has_type;
+		}
+		void clear_type () {
+			_has_type = false;
+		}
+		byte[]Serialize(byte field = 16) {
+			byte[]ret;
+			ret ~= toByteString(number,cast(byte)1);
+			static if (is(PhoneType:Object)) {
+				ret ~= type.Serialize(cast(byte)2);
+			} else {
+				// this is an enum, almost certainly
+				ret ~= toVarint!(int)(type,cast(byte)2);
+			}
+			ret ~= ufields;
+			// take care of header and length generation if necessary
+			if (field != 16) {
+				ret = genHeader(field,2)~toVarint(ret.length,field)[1..$]~ret;
+			}
+			return ret;
+		}
+		// if we're root, we can assume we own the whole string
+		// if not, the first thing we need to do is pull the length that belongs to us
+		static PhoneNumber Deserialize(inout byte[]manip,bool isroot=true) {
+			auto retobj = new PhoneNumber;
+			byte[]input = manip;
+			// cut apart the input string
+			if (!isroot) {
+				uint len = fromVarint!(uint)(manip);
+				input = manip[0..len];
+				manip = manip[len..$];
+			}
+			while(input.length) {
+				byte header = input[0];
+				input = input[1..$];
+				switch(getFieldNumber(header)) {
+				case 1:
+					retobj._number = fromByteString!(char[])(input);
+					retobj._has_number = true;
+					break;
+					case 2:
+					static if (is(PhoneType:Object)) {
+						retobj._type = PhoneType.Deserialize(input,false);
+					} else {
+						// this is an enum, almost certainly
+						retobj._type = fromVarint!(int)(input);
+					}
+					retobj._has_type = true;
+					break;
+				default:
+					// rip off unknown fields
+					retobj.ufields ~= header~ripUField(input,getWireType(header));
+					break;
+				}
+			}
+			if (retobj._has_number == false) throw new Exception(\"Did not find a number in the message parse.\");
+			return retobj;
+		}
+		void MergeFrom(PhoneNumber merger) {
+			if (merger.has_number) number = merger.number;
+			if (merger.has_type) type = merger.type;
+		}
+		static PhoneNumber opCall(inout byte[]input) {
+			return Deserialize(input);
+		}
+	}
+	char[] _name;
+	char[] name() {
+		return _name;
+	}
+	void name(char[] input_var) {
+		_name = input_var;
+		_has_name = true;
+	}
+	bool _has_name = false;
+	bool has_name () {
+		return _has_name;
+	}
+	void clear_name () {
+		_has_name = false;
+	}
+	int _id;
+	int id() {
+		return _id;
+	}
+	void id(int input_var) {
+		_id = input_var;
+		_has_id = true;
+	}
+	bool _has_id = false;
+	bool has_id () {
+		return _has_id;
+	}
+	void clear_id () {
+		_has_id = false;
+	}
+	char[] _email;
+	char[] email() {
+		return _email;
+	}
+	void email(char[] input_var) {
+		_email = input_var;
+		_has_email = true;
+	}
+	bool _has_email = false;
+	bool has_email () {
+		return _has_email;
+	}
+	void clear_email () {
+		_has_email = false;
+	}
+	PhoneNumber[]_phone;
+	PhoneNumber[]phone() {
+		return _phone;
+	}
+	void phone(PhoneNumber[]input_var) {
+		_phone = input_var;
+	}
+	bool has_phone () {
+		return _phone.length?1:0;
+	}
+	void clear_phone () {
+		_phone = null;
+	}
+	int phone_size () {
+		return _phone.length;
+	}
+	void add_phone (PhoneNumber __addme) {
+		_phone ~= __addme;
+	}
+	void add_phone (PhoneNumber[]__addme) {
+		_phone ~= __addme;
+	}
+	byte[]Serialize(byte field = 16) {
+		byte[]ret;
+		ret ~= toByteString(name,cast(byte)1);
+		ret ~= toVarint(id,cast(byte)2);
+		ret ~= toByteString(email,cast(byte)3);
+		foreach(iter;phone) {
+			static if (is(PhoneNumber:Object)) {
+				ret ~= iter.Serialize(cast(byte)4);
+			} else {
+				// this is an enum, almost certainly
+				ret ~= toVarint!(int)(iter,cast(byte)4);
+			}
+		}
+		ret ~= ufields;
+		// take care of header and length generation if necessary
+		if (field != 16) {
+			ret = genHeader(field,2)~toVarint(ret.length,field)[1..$]~ret;
+		}
+		return ret;
+	}
+	// if we're root, we can assume we own the whole string
+	// if not, the first thing we need to do is pull the length that belongs to us
+	static Person Deserialize(inout byte[]manip,bool isroot=true) {
+		auto retobj = new Person;
+		byte[]input = manip;
+		// cut apart the input string
+		if (!isroot) {
+			uint len = fromVarint!(uint)(manip);
+			input = manip[0..len];
+			manip = manip[len..$];
+		}
+		while(input.length) {
+			byte header = input[0];
+			input = input[1..$];
+			switch(getFieldNumber(header)) {
+			case 1:
+				retobj._name = fromByteString!(char[])(input);
+				retobj._has_name = true;
+				break;
+			case 2:
+				retobj._id = fromVarint!(int)(input);
+				retobj._has_id = true;
+				break;
+			case 3:
+				retobj._email = fromByteString!(char[])(input);
+				retobj._has_email = true;
+				break;
+				case 4:
+				static if (is(PhoneNumber:Object)) {
+					retobj._phone = PhoneNumber.Deserialize(input,false);
+				} else {
+					// this is an enum, almost certainly
+				if (getWireType(header) != 2) {
+						retobj._phone ~= fromVarint!(int)(input);
+					} else {
+						retobj._phone ~= fromPacked!(PhoneNumber,)(input);
+					}
+				}
+				break;
+			default:
+				// rip off unknown fields
+				retobj.ufields ~= header~ripUField(input,getWireType(header));
+				break;
+			}
+		}
+		if (retobj._has_name == false) throw new Exception(\"Did not find a name in the message parse.\");
+		if (retobj._has_id == false) throw new Exception(\"Did not find a id in the message parse.\");
+		return retobj;
+	}
+	void MergeFrom(Person merger) {
+		if (merger.has_name) name = merger.name;
+		if (merger.has_id) id = merger.id;
+		if (merger.has_email) email = merger.email;
+		if (merger.has_phone) add_phone(merger.phone);
+	}
+	static Person opCall(inout byte[]input) {
+		return Deserialize(input);
+	}
+}
+";
 	writefln("unittest ProtocolBuffer.pbroot");
 	auto root = PBRoot(pbstr);
 	debug {
