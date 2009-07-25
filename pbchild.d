@@ -188,11 +188,10 @@ struct PBChild {
 		indent ~= "	";
 		// check the header vs the type
 		char[]pack;
-		if (isPackable(type) && modifier == "repeated") {
-			ret ~= indent~"if (getWireType(header) != 2) {\n";
-			indent ~= "	";
-		}
+		ret ~= indent~"if (getWireType(header) == "~toString(wTFromType(type))~") {\n";
+		indent ~= "	";
 		ret ~= indent~"retobj._"~name~" "~(modifier=="repeated"?"~":"")~"= ";
+		bool isobj = false;
 		switch(type) {
 		case "float","double","sfixed32","sfixed64","fixed32","fixed64":
 			pack = "fromByteBlob!("~toDType(type)~")";
@@ -213,29 +212,38 @@ struct PBChild {
 		default:
 			// this covers enums and classen, since enums are declared as classes
 			// also, make sure we don't think we're root
-			ret = indent~"case "~toString(index)~":\n";
+			isobj = true;
+			ret = indent[0..$-2]~"case "~toString(index)~":\n";
+			indent = indent[0..$-1];
 			ret ~= indent~"static if (is("~type~":Object)) {\n";
 			// no need to worry about packedness here, since it can't be
 			ret ~= indent~"	retobj._"~name~" = "~type~".Deserialize(input,false);\n";
 			ret ~= indent~"} else {\n";
 			ret ~= indent~"	// this is an enum, almost certainly\n";
 			// worry about packedness here
+			ret ~= indent~"	if (getWireType(header) == 0) {\n";
+			ret ~= indent~(modifier=="repeated"?"	":"")~"		retobj._"~name~" "~(modifier=="repeated"?"~":"")~"= fromVarint!(int)(input);\n";
 			if (modifier == "repeated") {
-				ret ~= indent~"if (getWireType(header) != 2) {\n";
+				ret ~= indent~"		} else if (getWireType(header) == 2) {\n";
+				ret ~= indent~"			retobj._"~name~" ~= fromPacked!("~toDType(type)~","~pack~")(input);\n";
+				ret ~= indent~"		}\n";
 			}
-			ret ~= indent~(modifier=="repeated"?"	":"")~"	retobj._"~name~" "~(modifier=="repeated"?"~":"")~"= fromVarint!(int)(input);\n";
-			if (modifier == "repeated") {
-				ret ~= indent~"	} else {\n";
-				ret ~= indent~"		retobj._"~name~" ~= fromPacked!("~toDType(type)~","~pack~")(input);\n";
-				ret ~= indent~"	}\n";
-			}
+			ret ~= indent~"	} else {\n";
+			// this is not condoned, wiretype is invalid, so explode!
+			ret ~= indent~"		throw new Exception(\"Invalid wiretype \"~std.string.toString(getWireType(header))~\" for variable type "~type~"\");\n";
+			ret ~= indent~"	}\n";
 			ret ~= indent~"}\n";
 			break;
 		}
-		if (modifier == "repeated" && isPackable(type)) {
+		if (!isobj) {
 			indent = indent[0..$-1];
+			if (modifier == "repeated" && isPackable(type)) {
+				ret ~= indent~"} else if (getWireType(header) == 2) {\n";
+				ret ~= indent~"	retobj._"~name~" ~= fromPacked!("~toDType(type)~","~pack~")(input);\n";
+			}
 			ret ~= indent~"} else {\n";
-			ret ~= indent~"	retobj._"~name~" ~= fromPacked!("~toDType(type)~","~pack~")(input);\n";
+			// this is not condoned, wiretype is invalid, so explode!
+			ret ~= indent~"	throw new Exception(\"Invalid wiretype \"~std.string.toString(getWireType(header))~\" for variable type "~type~"\");\n";
 			ret ~= indent~"}\n";
 		}
 		// we need to modify this for both required and optional, repeated is taken care of
