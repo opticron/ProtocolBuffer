@@ -219,7 +219,6 @@ char[]ripQuotedValue(inout char[]pbstring) {
 	}
 	// inc to take the quotes with us
 	x++;
-	// XXX we should probably do error checking here
 	char[]tmp = pbstring[0..x];
 	pbstring = pbstring[x..$];
 	return tmp;
