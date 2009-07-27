@@ -87,7 +87,7 @@ struct PBChild {
 		if (!tmp.length) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Could not pull numeric index.");
 		child.index = cast(int)atoi(tmp);
 		if (child.index <= 0) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Numeric index can not be less than 1.");
-		if (child.index > 15) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Numeric index can not be greater than 15.");
+		if (child.index > (1<<29)-1) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Numeric index can not be greater than (1<<29)-1.");
 		// deal with inline options
 		pbstring = stripLWhite(pbstring);
                 if (pbstring[0] == '[') {
@@ -152,7 +152,7 @@ struct PBChild {
 				ret ~= indent~"foreach(iter;"~name~") {\n";
 				indent ~= "	";
 			}
-			ret ~= indent~"	ret ~= "~(packed?"iter":tname)~".Serialize(cast(byte)"~toString(index)~");\n";
+			ret ~= indent~"	ret ~= "~(packed?"iter":tname)~".Serialize("~toString(index)~");\n";
 			if (modifier == "repeated" && packed) {
 				indent = indent[0..$-1];
 				ret ~= indent~"}\n";
@@ -169,7 +169,7 @@ struct PBChild {
 			ret ~= indent~"ret ~= "~func;
 		}
 		// finish off the parameters, because they're the same for packed or not
-		ret ~= "("~tname~",cast(byte)"~toString(index)~");\n";
+		ret ~= "("~tname~","~toString(index)~");\n";
 		if (func == "toVarint!(int)") {
 			indent = indent[0..$-1];
 			ret ~= indent~"}\n";

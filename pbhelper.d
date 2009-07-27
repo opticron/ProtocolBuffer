@@ -5,34 +5,39 @@ import std.string;
 
 // varint translation code
 // this may have endian issues, maybe not, we'll see
-byte[]toVarint(bool input,byte field) {
+byte[]toVarint(bool input,int field) {
 	return toVarint(cast(long)(input?1:0),field);
 }
-byte[]toVarint(uint input,byte field) {
+byte[]toVarint(uint input,int field) {
 	return toVarint(cast(long)input,field);
 }
-byte[]toVarint(int input,byte field) {
+byte[]toVarint(int input,int field) {
 	return toVarint(cast(long)input,field);
 }
-byte[]toVarint(ulong input,byte field) {
+byte[]toVarint(ulong input,int field) {
 	return toVarint(cast(long)input,field);
 }
-byte[]toVarint(long input,byte field) {
+byte[]toVarint(long input,int field) {
+	byte[]ret;
+	// tack on the header and the varint
+	ret = genHeader(field,0)~_toVarint(input);
+	return ret;
+}
+byte[]_toVarint(long input) {
 	byte[]ret;
 	int x;
 	if (input < 0) {
 		// shortcut negative numbers, this is always the case
-		ret.length = 11;
+		ret.length = 10;
 	} else {
 		long tmp = input;
 		for (x = 1;tmp >= 128;x++) {
 			// arithmetic shift is fine, because we've already checked for negative numbers
 			tmp >>= 7;
 		}
-		x++; // have to account for the header byte containing the field number and wire type
 		ret.length = x;
 	}
-	for (x = 1;x<ret.length;x++) {
+	for (x = 0;x<ret.length;x++) {
 		// set the top bit
 		ret[x] = cast(byte)(1<<7);
 		ret[x] |= (cast(byte)input)&0b1111111;
@@ -40,9 +45,6 @@ byte[]toVarint(long input,byte field) {
 	}
 	// unset the top bit of the last data element
 	ret[$-1] &= 0b1111111;
-	// set up the header byte
-	// wiretype is 0, so all we need is the shifted field number
-	ret[0] = genHeader(field,0);
 	return ret;
 }
 
@@ -92,14 +94,14 @@ int getFieldNumber(byte input) {
 	return (input>>3)&0b1111;
 }
 
-byte genHeader(byte field,byte wiretype) {
-	return cast(byte)((field<<3)|(wiretype&0x3));
+byte[]genHeader(int field,byte wiretype) {
+	return _toVarint((field<<3)|(wiretype&0x3));
 }
 
 unittest {
 	writefln("unittest ProtocolBuffer.pbhelper.toVarint");
 	debug writefln("toVarint(bool)...");
-	byte[]tmp = toVarint(true,cast(byte)5);
+	byte[]tmp = toVarint(true,5);
 	byte cmp;
 	debug writefln("length");
 	assert(tmp.length == 2);
@@ -109,7 +111,7 @@ unittest {
 	debug writefln("first data byte(%b): %b",cmp,tmp[1]);
 	assert(tmp[1] == cmp);
 	debug writefln("toVarint(int)...");
-	tmp = toVarint(300,cast(byte)12);
+	tmp = toVarint(300,12);
 	debug writefln("length");
 	assert(tmp.length == 3);
 	cmp = cast(byte)0b10101100;
@@ -126,19 +128,19 @@ unittest {
 	assert(ret == 300);
 
 	debug writefln("Checking max/min edges...");
-	tmp = toVarint(ulong.max,cast(byte)5);
+	tmp = toVarint(ulong.max,5);
 	tmp = tmp[1..$];
 	assert(ulong.max == fromVarint!(ulong)(tmp));
 
-	tmp = toVarint(long.min,cast(byte)5);
+	tmp = toVarint(long.min,5);
 	tmp = tmp[1..$];
 	assert(long.min == fromVarint!(long)(tmp));
 
-	tmp = toVarint(int.min,cast(byte)5);
+	tmp = toVarint(int.min,5);
 	tmp = tmp[1..$];
 	assert(int.min == fromVarint!(int)(tmp));
 
-	tmp = toVarint(uint.max,cast(byte)5);
+	tmp = toVarint(uint.max,5);
 	tmp = tmp[1..$];
 	uint uitmp = fromVarint!(uint)(tmp);
 	debug writefln("%d should be %d",uitmp,uint.max);
@@ -148,10 +150,10 @@ unittest {
 }
 
 // zigzag encoding and decodings
-byte[]toSInt(int input,byte field) {
+byte[]toSInt(int input,int field) {
 	return toVarint((input<<1)^(input>>31),field);
 }
-byte[]toSInt(long input,byte field) {
+byte[]toSInt(long input,int field) {
 	return toVarint((input<<1)^(input>>63),field);
 }
 
@@ -167,7 +169,7 @@ T fromSInt(T)(inout byte[]input) {
 unittest {
 	writefln("unittest ProtocolBuffer.pbhelper.toSInt");
 	debug writefln("toSInt(int)...");
-	byte[]tmp = toSInt(0,cast(byte)12);
+	byte[]tmp = toSInt(0,12);
 	debug writefln("length");
 	assert(tmp.length == 2);
 	byte cmp = cast(byte)0b0;
@@ -178,7 +180,7 @@ unittest {
 	assert(tmp[0] == cmp);
 
 	debug writefln("toSInt(long)...");
-	tmp = toSInt(cast(long)-2,cast(byte)12);
+	tmp = toSInt(cast(long)-2,12);
 	debug writefln("length");
 	assert(tmp.length == 2);
 	cmp = cast(byte)0b11;
@@ -195,13 +197,11 @@ unittest {
 
 // here are the remainder of the numeric types, basically just 32 and 64 bit blobs
 // valid for uint, float, ulong, and double
-byte[]toByteBlob(T)(T input,byte field) {
+byte[]toByteBlob(T)(T input,int field) {
 	byte[]ret;
-	ret.length = T.sizeof+1;
 	byte[]tmp = (cast(byte*)&input)[0..T.sizeof].dup;
 	version (BigEndian) {tmp.reverse;}
-	ret[1..T.sizeof+1] = tmp[0..T.sizeof];
-	ret[0] = genHeader(field,T.sizeof==8?1:5);
+	ret = genHeader(field,T.sizeof==8?1:5)~tmp[0..T.sizeof];
 	return ret;
 }
 
@@ -226,9 +226,9 @@ unittest {
 }
 
 // string functions!
-byte[]toByteString(T:T[])(T[]input,byte field) {
+byte[]toByteString(T:T[])(T[]input,int field) {
 	// we need to rip off the generated header byte for code reuse, this could be done better
-	byte[]tmp = toVarint(input.length,cast(byte)0)[1..$];
+	byte[]tmp = _toVarint(input.length);
 	return genHeader(field,2)~tmp~cast(byte[])input;
 }
 
@@ -255,7 +255,7 @@ byte[]ripUField(inout byte[]input,byte wiretype) {
 	switch(wiretype) {
 	case 0:
 		// snag a varint
-		return toVarint(fromVarint!(long)(input),cast(byte)0)[1..$];
+		return _toVarint(fromVarint!(long)(input));
 	case 1:
 		// snag a 64bit chunk
 		byte[]tmp = input[0..8];
@@ -265,7 +265,7 @@ byte[]ripUField(inout byte[]input,byte wiretype) {
 		// snag a length delimited chunk
 		auto blen = fromVarint!(long)(input);
 		byte[]tmp = input[0..cast(uint)blen];
-		return toVarint(blen,cast(byte)0)[1..$]~tmp;
+		return _toVarint(blen)~tmp;
 	case 5:
 		// snag a 32bit chunk
 		byte[]tmp = input[0..4];
@@ -279,7 +279,7 @@ byte[]ripUField(inout byte[]input,byte wiretype) {
 }
 
 // handle packed fields
-byte[]toPacked(T:T[],alias serializer)(T[]packed,byte field) {
+byte[]toPacked(T:T[],alias serializer)(T[]packed,int field) {
 	// zero length packed repeated fields serialize to nothing
 	if (!packed.length) return null;
 	byte[]ret;
@@ -288,7 +288,7 @@ byte[]toPacked(T:T[],alias serializer)(T[]packed,byte field) {
 		ret ~= serializer(pack,field)[1..$];
 	}
 	// now that everything is serialized, grab the length, convert to varint, and tack on a header
-	ret = [genHeader(field,cast(byte)2)]~toVarint(ret.length,field)[1..$]~ret;
+	ret = genHeader(field,cast(byte)2)~_toVarint(ret.length)~ret;
 	return ret;
 }
 

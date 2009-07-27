@@ -65,8 +65,8 @@ struct PBMessage {
 
 	char[]genSerCode(char[]indent) {
 		char[]ret = "";
-		// use 16 as a default value, since a nibble can not produce that number
-		ret ~= indent~"byte[]Serialize(byte field = 16) {\n";
+		// use -1 as a default value, since a nibble can not produce that number
+		ret ~= indent~"byte[]Serialize(int field = -1) {\n";
 		indent = indent~"	";
 		// codegen is fun!
 		ret ~= indent~"byte[]ret;\n";
@@ -79,7 +79,7 @@ struct PBMessage {
 
 		// include code to determine if we need to add a tag and a length
 		ret ~= indent~"// take care of header and length generation if necessary\n";
-		ret ~= indent~"if (field != 16) {\n";
+		ret ~= indent~"if (field != -1) {\n";
 		// take care of length calculation and integration of header and length
 		ret ~= indent~"	ret = genHeader(field,2)~toVarint(ret.length,field)[1..$]~ret;\n";
 		ret ~= indent~"}\n";
@@ -112,8 +112,7 @@ struct PBMessage {
 		// deserialization code goes here
 		ret ~= indent~"while(input.length) {\n";
 		indent = indent~"	";
-		ret ~= indent~"byte header = input[0];\n";
-		ret ~= indent~"input = input[1..$];\n";
+		ret ~= indent~"int header = fromVarint!(int)(input);\n";
 		ret ~= indent~"switch(getFieldNumber(header)) {\n";
 		//here goes the meat, handily, it is generated in the children
 		foreach(pbchild;children) {
@@ -122,7 +121,7 @@ struct PBMessage {
 		// take care of default case
 		ret ~= indent~"default:\n";
 		ret ~= indent~"	// rip off unknown fields\n";
-		ret ~= indent~"	retobj.ufields ~= header~ripUField(input,getWireType(header));\n";
+		ret ~= indent~"	retobj.ufields ~= _toVarint(header)~ripUField(input,getWireType(header));\n";
 		ret ~= indent~"	break;\n";
 		ret ~= indent~"}\n";
 		indent = indent[0..$-1];
@@ -264,11 +263,11 @@ unittest {
 	static class simple {
 		// deal with unknown fields
 		byte[]ufields;
-		byte[]Serialize(byte field = 16) {
+		byte[]Serialize(int field = -1) {
 			byte[]ret;
 			ret ~= ufields;
 			// take care of header and length generation if necessary
-			if (field != 16) {
+			if (field != -1) {
 				ret = genHeader(field,2)~toVarint(ret.length,field)[1..$]~ret;
 			}
 			return ret;
@@ -285,12 +284,11 @@ unittest {
 				manip = manip[len..$];
 			}
 			while(input.length) {
-				byte header = input[0];
-				input = input[1..$];
+				int header = fromVarint!(int)(input);
 				switch(getFieldNumber(header)) {
 				default:
 					// rip off unknown fields
-					retobj.ufields ~= header~ripUField(input,getWireType(header));
+					retobj.ufields ~= _toVarint(header)~ripUField(input,getWireType(header));
 					break;
 				}
 			}
@@ -332,18 +330,18 @@ unittest {
 	void clear_quack () {
 		_has_quack = false;
 	}
-	byte[]Serialize(byte field = 16) {
+	byte[]Serialize(int field = -1) {
 		byte[]ret;
-		ret ~= toVarint(i32test,cast(byte)1);
+		ret ~= toVarint(i32test,1);
 		static if (is(simple:Object)) {
-			ret ~= quack.Serialize(cast(byte)5);
+			ret ~= quack.Serialize(5);
 		} else {
 			// this is an enum, almost certainly
-			ret ~= toVarint!(int)(quack,cast(byte)5);
+			ret ~= toVarint!(int)(quack,5);
 		}
 		ret ~= ufields;
 		// take care of header and length generation if necessary
-		if (field != 16) {
+		if (field != -1) {
 			ret = genHeader(field,2)~toVarint(ret.length,field)[1..$]~ret;
 		}
 		return ret;
@@ -360,25 +358,32 @@ unittest {
 			manip = manip[len..$];
 		}
 		while(input.length) {
-			byte header = input[0];
-			input = input[1..$];
+			int header = fromVarint!(int)(input);
 			switch(getFieldNumber(header)) {
 			case 1:
-				retobj._i32test = fromVarint!(int)(input);
+				if (getWireType(header) == 0) {
+					retobj._i32test = fromVarint!(int)(input);
+				} else {
+					throw new Exception(\"Invalid wiretype \"~std.string.toString(getWireType(header))~\" for variable type int32\");
+				}
 				retobj._has_i32test = true;
 				break;
-				case 5:
+			case 5:
 				static if (is(simple:Object)) {
 					retobj._quack = simple.Deserialize(input,false);
 				} else {
 					// this is an enum, almost certainly
-					retobj._quack = fromVarint!(int)(input);
+					if (getWireType(header) == 0) {
+						retobj._quack = fromVarint!(int)(input);
+					} else {
+						throw new Exception(\"Invalid wiretype \"~std.string.toString(getWireType(header))~\" for variable type simple\");
+					}
 				}
 				retobj._has_quack = true;
 				break;
 			default:
 				// rip off unknown fields
-				retobj.ufields ~= header~ripUField(input,getWireType(header));
+				retobj.ufields ~= _toVarint(header)~ripUField(input,getWireType(header));
 				break;
 			}
 		}
