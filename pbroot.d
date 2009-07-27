@@ -5,6 +5,7 @@ module ProtocolBuffer.pbroot;
 import ProtocolBuffer.pbgeneral;
 import ProtocolBuffer.pbmessage;
 import ProtocolBuffer.pbenum;
+import ProtocolBuffer.pbextension;
 import std.string;
 import std.stdio;
 
@@ -15,7 +16,7 @@ struct PBRoot {
 	// this package name should translate directly to the module name of the implementation file
 	// but I might want to mix everything in without a separate compiler...or make it available both ways
 	char[]Package;
-	// XXX need to support extensions here XXX
+	PBExtension[]extensions;
 	char[]toDString(char[]indent="") {
 		char[]retstr = "";
 		retstr ~= "import ProtocolBuffer.pbhelper;\n";
@@ -46,6 +47,9 @@ struct PBRoot {
 				break;
 			case PBTypes.PB_Message:
 				root.message_defs ~= PBMessage(pbstring);
+				break;
+			case PBTypes.PB_Extend:
+				root.extensions ~= PBExtension(pbstring);
 				break;
 			case PBTypes.PB_Enum:
 				root.enum_defs ~= PBEnum(pbstring);

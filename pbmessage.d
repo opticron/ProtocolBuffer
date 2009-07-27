@@ -5,6 +5,7 @@ module ProtocolBuffer.pbmessage;
 import ProtocolBuffer.pbgeneral;
 import ProtocolBuffer.pbenum;
 import ProtocolBuffer.pbchild;
+import ProtocolBuffer.pbextension;
 import std.string;
 import std.stdio;
 
@@ -19,8 +20,13 @@ struct PBMessage {
 	PBEnum[]enum_defs;
 	// variable/structure/enum instances
 	PBChild[]children;
-	// XXX i need to deal with extensions at some point XXX
-	// XXX need to support options at some point XXX
+	// this is for the compiler to stuff things into when it finds applicable extensions to the class
+	PBChild[]child_exten;
+	PBExtension[]extensions;
+	// these set the allowable bounds for extensions to this message
+	int exten_min=-1;
+	int exten_max=-1;
+	// XXX need to support options correctly XXX
 	// XXX need to support services at some point XXX
 	char[]toDString(char[]indent) {
 		char[]retstr = "";
@@ -167,6 +173,12 @@ struct PBMessage {
 			case PBTypes.PB_Enum:
 				message.enum_defs ~= PBEnum(pbstring);
 				break;
+			case PBTypes.PB_Extend:
+				message.extensions ~= PBExtension(pbstring);
+				break;
+			case PBTypes.PB_Extension:
+				message.ripExtenRange(pbstring);
+				break;
 			case PBTypes.PB_Repeated:
 			case PBTypes.PB_Required:
 			case PBTypes.PB_Optional:
@@ -204,6 +216,42 @@ struct PBMessage {
 		indent = indent[0..$-1];
 		ret ~= indent~"}\n";
 		return ret;
+	}
+
+	void ripExtenRange(inout char[]pbstring) {
+		pbstring = pbstring["extensions".length..$];
+		pbstring = stripLWhite(pbstring);
+		// expect next to be numeric
+		char[]tmp = stripValidChars(CClass.Numeric,pbstring);
+		if (!tmp.length) throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range");
+		exten_min = cast(int)atoi(tmp);
+		pbstring = stripLWhite(pbstring);
+		// make sure we have "to"
+		if (pbstring[0..2].icmp("to") != 0) {
+			throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range");
+		}
+		// rip of "to"
+		pbstring = pbstring[2..$];
+		pbstring = stripLWhite(pbstring);
+		// check for "max" and rip it if necessary
+		if (pbstring[0..3].icmp("max") == 0) {
+			pbstring = pbstring[3..$];
+			// (1<<29)-1 is defined as the maximum extension value
+			exten_max = (1<<29)-1;
+		} else {
+			tmp = stripValidChars(CClass.Numeric,pbstring);
+			if (!tmp.length) throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range");
+			exten_max = cast(int)atoi(tmp);
+			if (exten_max > (1<<29)-1) {
+				throw new PBParseException("Message Parse("~name~" extension range)","Max defined extension value is greater than allowable max");
+			}
+		}
+		pbstring = stripLWhite(pbstring);
+		// check for ; and rip it off
+		if (pbstring[0] != ';') {
+			throw new PBParseException("Message Parse("~name~" extension range)","Missing ; at end of extension range definition");
+		}
+		pbstring = pbstring[1..$];
 	}
 }
 
