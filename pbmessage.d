@@ -22,6 +22,7 @@ struct PBMessage {
 	PBChild[]children;
 	// this is for the compiler to stuff things into when it finds applicable extensions to the class
 	PBChild[]child_exten;
+	// this is for actual read extensions
 	PBExtension[]extensions;
 	// these set the allowable bounds for extensions to this message
 	int exten_min=-1;
@@ -52,6 +53,8 @@ struct PBMessage {
 		retstr ~= genDesCode(indent);
 		// define merging function
 		retstr ~= genMergeCode(indent);
+		// deal with what little we need to do for extensions
+		retstr ~= extensions.genExtString(indent~"static ");
 		// include a static opcall to do deserialization to make coding simpler
 		retstr ~= indent~"static "~name~" opCall(inout byte[]input) {\n";
 		retstr ~= indent~"	return Deserialize(input);\n";
@@ -252,6 +255,15 @@ struct PBMessage {
 		}
 		pbstring = pbstring[1..$];
 	}
+}
+
+char[]genExtString(PBExtension[]extens,char[]indent) {
+	// we just need to generate a list of static const variables
+	char[]ret;
+	foreach(exten;extens) foreach(child;exten.children) {
+		ret ~= indent~"const int "~child.name~" = "~toString(child.index)~";\n";
+	}
+	return ret;
 }
 
 unittest {

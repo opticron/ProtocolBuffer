@@ -222,11 +222,10 @@ struct PBChild {
 			ret ~= indent~"	// this is an enum, almost certainly\n";
 			// worry about packedness here
 			ret ~= indent~"	if (getWireType(header) == 0) {\n";
-			ret ~= indent~(modifier=="repeated"?"	":"")~"		retobj._"~name~" "~(modifier=="repeated"?"~":"")~"= fromVarint!(int)(input);\n";
+			ret ~= indent~"		retobj._"~name~" "~(modifier=="repeated"?"~":"")~"= fromVarint!(int)(input);\n";
 			if (modifier == "repeated") {
-				ret ~= indent~"		} else if (getWireType(header) == 2) {\n";
-				ret ~= indent~"			retobj._"~name~" ~= fromPacked!("~toDType(type)~","~pack~")(input);\n";
-				ret ~= indent~"		}\n";
+				ret ~= indent~"	} else if (getWireType(header) == 2) {\n";
+				ret ~= indent~"		retobj._"~name~" ~= fromPacked!("~toDType(type)~",fromVarint!(int))(input);\n";
 			}
 			ret ~= indent~"	} else {\n";
 			// this is not condoned, wiretype is invalid, so explode!

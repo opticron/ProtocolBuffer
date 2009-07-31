@@ -13,13 +13,13 @@ struct PBRoot {
 	PBMessage[]message_defs;
 	PBEnum[]enum_defs;
 	char[][]imports;
-	// this package name should translate directly to the module name of the implementation file
-	// but I might want to mix everything in without a separate compiler...or make it available both ways
 	char[]Package;
 	PBExtension[]extensions;
 	char[]toDString(char[]indent="") {
 		char[]retstr = "";
 		retstr ~= "import ProtocolBuffer.pbhelper;\n";
+		// do what we need for extensions defined here
+		retstr ~= extensions.genExtString(indent);
 		// write out enums
 		foreach(pbenum;enum_defs) {
 			retstr ~= pbenum.toDString(indent);
@@ -385,8 +385,8 @@ class Person {
 	writefln("unittest ProtocolBuffer.pbroot");
 	auto root = PBRoot(pbstr);
 	debug {
-		writefln("Generated string:\n%s",root.toDString);
 		writefln("Correct string:\n%s",compstr);
+		writefln("Generated string:\n%s",root.toDString);
 	}
 	assert(root.toDString == compstr);
 	debug writefln("");
