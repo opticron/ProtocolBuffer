@@ -36,7 +36,6 @@ struct PBExtension {
 		// now we're ready to enter the loop and parse children
 		while(pbstring[0] != '}') {
 			// start parsing, we shouldn't have any whitespace here
-			// XXX as far as I can tell, only children are allowed here, nothing is said of enum or message definitions
 			exten.children ~= PBChild(pbstring);
 			// this needs to stay at the end
 			pbstring = stripLWhite(pbstring);

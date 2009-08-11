@@ -86,12 +86,12 @@ in {
 	return cast(T)output;
 }
 
-int getWireType(byte input) {
+int getWireType(int input) {
 	return input&0b111;
 }
 
-int getFieldNumber(byte input) {
-	return (input>>3)&0b1111;
+int getFieldNumber(int input) {
+	return input>>3;
 }
 
 byte[]genHeader(int field,byte wiretype) {
@@ -251,7 +251,7 @@ unittest {
 	debug writefln("");
 }
 
-byte[]ripUField(inout byte[]input,byte wiretype) {
+byte[]ripUField(inout byte[]input,int wiretype) {
 	switch(wiretype) {
 	case 0:
 		// snag a varint

@@ -68,7 +68,7 @@ struct PBChild {
 		// set accessor
 		ret ~= indent~(is_dep?"deprecated ":"")~"void SetExtension(int T:"~toString(index)~")("~toDType(type)~(modifier=="repeated"?"[]":" ")~"input_var) {\n";
 		ret ~= indent~"	__exten_"~name~" = input_var;\n";
-		if (modifier != "repeated") ret ~= indent~"	_has_exten_"~name~" = true;\n";
+		if (modifier != "repeated") ret ~= indent~"	_has__exten_"~name~" = true;\n";
 		ret ~= indent~"}\n";
 		if (modifier == "repeated") {
 			ret ~= indent~"bool HasExtension(int T:"~toString(index)~")() {\n";
@@ -90,12 +90,12 @@ struct PBChild {
 			ret ~= indent~"	__exten_"~name~" ~= __addme;\n";
 			ret ~= indent~"}\n";
 		} else {
-			ret ~= indent~"bool _has_exten_"~name~" = false;\n";
+			ret ~= indent~"bool _has__exten_"~name~" = false;\n";
 			ret ~= indent~"bool HasExtension(int T:"~toString(index)~")() {\n";
-			ret ~= indent~"	return _has_exten_"~name~";\n";
+			ret ~= indent~"	return _has__exten_"~name~";\n";
 			ret ~= indent~"}\n";
 			ret ~= indent~"void ClearExtension(int T:"~toString(index)~")() {\n";
-			ret ~= indent~"	_has_exten_"~name~" = false;\n";
+			ret ~= indent~"	_has__exten_"~name~" = false;\n";
 			ret ~= indent~"}\n";
 		}
 		return ret;
@@ -158,11 +158,12 @@ struct PBChild {
 		throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","No idea what to do with string after index and options.");
 	}
 
-	char[]genSerLine(char[]indent) {
-		char[]tname = name;
+	char[]genSerLine(char[]indent,bool is_exten = false) {
+		char[]tname = "_"~name;
+		if (is_exten) tname = "__exten"~tname;
 		char[]ret;
 		if (modifier == "repeated" && !packed) {
-			ret ~= indent~"foreach(iter;"~name~") {\n";
+			ret ~= indent~"foreach(iter;"~tname~") {\n";
 			tname = "iter";
 			indent ~= "	";
 		}
@@ -206,10 +207,12 @@ struct PBChild {
 			ret ~= indent~"// this is an enum, almost certainly\n";
 		}
 		// take care of packed circumstances
+		ret ~= indent;
 		if (modifier == "repeated" && packed) {
-			ret ~= indent~"ret ~= toPacked!("~toDType(type)~","~func~")";
+			ret ~= "ret ~= toPacked!("~toDType(type)~","~func~")";
 		} else {
-			ret ~= indent~"ret ~= "~func;
+			if (modifier != "repeated") ret ~= "if (_has"~tname~") ";
+			ret ~= "ret ~= "~func;
 		}
 		// finish off the parameters, because they're the same for packed or not
 		ret ~= "("~tname~","~toString(index)~");\n";
@@ -224,8 +227,10 @@ struct PBChild {
 		return ret;
 	}
 
-	char[]genDesLine(char[]indent) {
+	char[]genDesLine(char[]indent,bool is_exten = false) {
 		char[]ret;
+		char[]tname = "_"~name;
+		if (is_exten) tname = "__exten"~tname;
 		// check header byte with case since we're guaranteed to be in a switch
 		ret ~= indent~"case "~toString(index)~":\n";
 		indent ~= "	";
@@ -233,7 +238,7 @@ struct PBChild {
 		char[]pack;
 		ret ~= indent~"if (getWireType(header) == "~toString(wTFromType(type))~") {\n";
 		indent ~= "	";
-		ret ~= indent~"retobj._"~name~" "~(modifier=="repeated"?"~":"")~"= ";
+		ret ~= indent~"retobj."~tname~" "~(modifier=="repeated"?"~":"")~"= ";
 		bool isobj = false;
 		switch(type) {
 		case "float","double","sfixed32","sfixed64","fixed32","fixed64":
@@ -260,15 +265,15 @@ struct PBChild {
 			indent = indent[0..$-1];
 			ret ~= indent~"static if (is("~type~":Object)) {\n";
 			// no need to worry about packedness here, since it can't be
-			ret ~= indent~"	retobj._"~name~" = "~type~".Deserialize(input,false);\n";
+			ret ~= indent~"	retobj."~tname~" = "~type~".Deserialize(input,false);\n";
 			ret ~= indent~"} else {\n";
 			ret ~= indent~"	// this is an enum, almost certainly\n";
 			// worry about packedness here
 			ret ~= indent~"	if (getWireType(header) == 0) {\n";
-			ret ~= indent~"		retobj._"~name~" "~(modifier=="repeated"?"~":"")~"= fromVarint!(int)(input);\n";
+			ret ~= indent~"		retobj."~tname~" "~(modifier=="repeated"?"~":"")~"= fromVarint!(int)(input);\n";
 			if (modifier == "repeated") {
 				ret ~= indent~"	} else if (getWireType(header) == 2) {\n";
-				ret ~= indent~"		retobj._"~name~" ~= fromPacked!("~toDType(type)~",fromVarint!(int))(input);\n";
+				ret ~= indent~"		retobj."~tname~" ~= fromPacked!("~toDType(type)~",fromVarint!(int))(input);\n";
 			}
 			ret ~= indent~"	} else {\n";
 			// this is not condoned, wiretype is invalid, so explode!
@@ -281,7 +286,7 @@ struct PBChild {
 			indent = indent[0..$-1];
 			if (modifier == "repeated" && isPackable(type)) {
 				ret ~= indent~"} else if (getWireType(header) == 2) {\n";
-				ret ~= indent~"	retobj._"~name~" ~= fromPacked!("~toDType(type)~","~pack~")(input);\n";
+				ret ~= indent~"	retobj."~tname~" ~= fromPacked!("~toDType(type)~","~pack~")(input);\n";
 			}
 			ret ~= indent~"} else {\n";
 			// this is not condoned, wiretype is invalid, so explode!
@@ -290,7 +295,7 @@ struct PBChild {
 		}
 		// we need to modify this for both required and optional, repeated is taken care of
 		if (modifier != "repeated") {
-			ret ~= indent~"retobj._has_"~name~" = true;\n";
+			ret ~= indent~"retobj._has"~tname~" = true;\n";
 		}
 		// tack on the break so we don't have fallthrough
 		ret ~= indent~"break;\n";

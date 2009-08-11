@@ -27,8 +27,8 @@ struct PBMessage {
 	// these set the allowable bounds for extensions to this message
 	int exten_min=-1;
 	int exten_max=-1;
-	// XXX need to support options correctly XXX
-	// XXX need to support services at some point XXX
+	// XXX need to support options correctly 
+	// XXX need to support services at some point 
 	char[]toDString(char[]indent) {
 		char[]retstr = "";
 		retstr ~= indent~(indent.length?"static ":"")~"class "~name~" {\n";
@@ -81,6 +81,9 @@ struct PBMessage {
 		foreach(pbchild;children) {
 			ret ~= pbchild.genSerLine(indent);
 		}
+		foreach(pbchild;child_exten) {
+			ret ~= pbchild.genSerLine(indent,true);
+		}
 		// tack on unknown bytes
 		ret ~= indent~"ret ~= ufields;\n";
 
@@ -125,6 +128,9 @@ struct PBMessage {
 		foreach(pbchild;children) {
 			ret ~= pbchild.genDesLine(indent);
 		}
+		foreach(pbchild;child_exten) {
+			ret ~= pbchild.genDesLine(indent,true);
+		}
 		// take care of default case
 		ret ~= indent~"default:\n";
 		ret ~= indent~"	// rip off unknown fields\n";
@@ -134,7 +140,8 @@ struct PBMessage {
 		indent = indent[0..$-1];
 		ret ~= indent~"}\n";
 
-		// check for required  fields
+		// check for required fields
+		// XXX can extensions be required?
 		foreach(pbchild;children) if (pbchild.modifier == "required") {
 			ret ~= indent~"if (retobj._has_"~pbchild.name~" == false) throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n";
 		}
