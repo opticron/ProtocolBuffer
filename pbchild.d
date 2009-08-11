@@ -58,6 +58,49 @@ struct PBChild {
 		return ret;
 	}
 
+	char[]genExtenCode(char[]indent) {
+		char[]ret;
+		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~"__exten_"~name~(valdefault.length?" = "~valdefault:"")~";\n";
+		// get accessor
+		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~"GetExtension(int T:"~toString(index)~")() {\n";
+		ret ~= indent~"	return __exten_"~name~";\n";
+		ret ~= indent~"}\n";
+		// set accessor
+		ret ~= indent~(is_dep?"deprecated ":"")~"void SetExtension(int T:"~toString(index)~")("~toDType(type)~(modifier=="repeated"?"[]":" ")~"input_var) {\n";
+		ret ~= indent~"	__exten_"~name~" = input_var;\n";
+		if (modifier != "repeated") ret ~= indent~"	_has_exten_"~name~" = true;\n";
+		ret ~= indent~"}\n";
+		if (modifier == "repeated") {
+			ret ~= indent~"bool HasExtension(int T:"~toString(index)~")() {\n";
+			ret ~= indent~"	return __exten_"~name~".length?1:0;\n";
+			ret ~= indent~"}\n";
+			ret ~= indent~"void ClearExtension(int T:"~toString(index)~")() {\n";
+			ret ~= indent~"	__exten_"~name~" = null;\n";
+			ret ~= indent~"}\n";
+			// technically, they can just do class.item.length
+			// there is no need for this
+			ret ~= indent~"int ExtensionSize(int T:"~toString(index)~")() {\n";
+			ret ~= indent~"	return __exten_"~name~".length;\n";
+			ret ~= indent~"}\n";
+			// functions to do additions, both singular and array
+			ret ~= indent~"void AddExtension(int T:"~toString(index)~")("~toDType(type)~" __addme) {\n";
+			ret ~= indent~"	__exten_"~name~" ~= __addme;\n";
+			ret ~= indent~"}\n";
+			ret ~= indent~"void AddExtension(int T:"~toString(index)~")("~toDType(type)~"[]__addme) {\n";
+			ret ~= indent~"	__exten_"~name~" ~= __addme;\n";
+			ret ~= indent~"}\n";
+		} else {
+			ret ~= indent~"bool _has_exten_"~name~" = false;\n";
+			ret ~= indent~"bool HasExtension(int T:"~toString(index)~")() {\n";
+			ret ~= indent~"	return _has_exten_"~name~";\n";
+			ret ~= indent~"}\n";
+			ret ~= indent~"void ClearExtension(int T:"~toString(index)~")() {\n";
+			ret ~= indent~"	_has_exten_"~name~" = false;\n";
+			ret ~= indent~"}\n";
+		}
+		return ret;
+	}
+
 	static PBChild opCall(inout char[]pbstring)
 	in {
 		assert(pbstring.length);

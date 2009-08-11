@@ -44,9 +44,13 @@ struct PBMessage {
 		foreach(pbmsg;message_defs) {
 			retstr ~= pbmsg.toDString(indent);
 		}
-		// last, do the individual instantiations
+		// do the individual instantiations
 		foreach(pbchild;children) {
 			retstr ~= pbchild.toDString(indent);
+		}
+		// last, do the extension instantiations
+		foreach(pbchild;child_exten) {
+			retstr ~= pbchild.genExtenCode(indent);
 		}
 		// here is where we add the code to serialize and deserialize
 		retstr ~= genSerCode(indent);

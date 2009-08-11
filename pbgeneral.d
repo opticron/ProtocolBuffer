@@ -77,8 +77,10 @@ in {
 		return PBTypes.PB_Option;
 	case "import":
 		return PBTypes.PB_Import;
-	case "extension":
+	case "extensions":
+		return PBTypes.PB_Extension;
 	case "extend":
+		return PBTypes.PB_Extend;
 	case "service":
 		throw new PBParseException("Protocol Buffer Definition",capitalize(type)~" definitions are not currently supported.");
 	default:
