@@ -25,8 +25,11 @@ struct PBMessage {
 	// this is for actual read extensions
 	PBExtension[]extensions;
 	// these set the allowable bounds for extensions to this message
-	int exten_min=-1;
-	int exten_max=-1;
+	struct allow_exten {
+		int min=-1;
+		int max=-1;
+	}
+	allow_exten[]exten_sets;
 	// XXX need to support options correctly 
 	// XXX need to support services at some point 
 	char[]toDString(char[]indent) {
@@ -234,10 +237,11 @@ struct PBMessage {
 	void ripExtenRange(inout char[]pbstring) {
 		pbstring = pbstring["extensions".length..$];
 		pbstring = stripLWhite(pbstring);
+		allow_exten ext;
 		// expect next to be numeric
 		char[]tmp = stripValidChars(CClass.Numeric,pbstring);
 		if (!tmp.length) throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range");
-		exten_min = cast(int)atoi(tmp);
+		ext.min = cast(int)atoi(tmp);
 		pbstring = stripLWhite(pbstring);
 		// make sure we have "to"
 		if (pbstring[0..2].icmp("to") != 0) {
@@ -250,12 +254,12 @@ struct PBMessage {
 		if (pbstring[0..3].icmp("max") == 0) {
 			pbstring = pbstring[3..$];
 			// (1<<29)-1 is defined as the maximum extension value
-			exten_max = (1<<29)-1;
+			ext.max = (1<<29)-1;
 		} else {
 			tmp = stripValidChars(CClass.Numeric,pbstring);
 			if (!tmp.length) throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range");
-			exten_max = cast(int)atoi(tmp);
-			if (exten_max > (1<<29)-1) {
+			ext.max = cast(int)atoi(tmp);
+			if (ext.max > (1<<29)-1) {
 				throw new PBParseException("Message Parse("~name~" extension range)","Max defined extension value is greater than allowable max");
 			}
 		}
@@ -265,6 +269,7 @@ struct PBMessage {
 			throw new PBParseException("Message Parse("~name~" extension range)","Missing ; at end of extension range definition");
 		}
 		pbstring = pbstring[1..$];
+		exten_sets ~= ext;
 	}
 }
 
