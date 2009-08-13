@@ -144,7 +144,9 @@ struct PBMessage {
 		ret ~= indent~"}\n";
 
 		// check for required fields
-		// XXX can extensions be required?
+		foreach(pbchild;child_exten) if (pbchild.modifier == "required") {
+			ret ~= indent~"if (retobj._has__exten_"~pbchild.name~" == false) throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n";
+		}
 		foreach(pbchild;children) if (pbchild.modifier == "required") {
 			ret ~= indent~"if (retobj._has_"~pbchild.name~" == false) throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n";
 		}
