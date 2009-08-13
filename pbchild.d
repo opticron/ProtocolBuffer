@@ -144,7 +144,7 @@ struct PBChild {
 			} else if (opt.name == "packed" && opt.value == "true") {
 				if (child.modifier == "required" || child.modifier == "optional") throw new PBParseException("Packed Option("~child.name~" packed)","Packed options can not be applied to "~child.modifier~" fields.");
 				if (child.type == "string" || child.type == "bytes") throw new PBParseException("Packed Option("~child.name~" packed)","Packed options can not be applied to "~child.type~" types.");
-				// XXX applying packed to message types is not properly checked, but is avoided in deser code
+				// applying packed to message types is not properly checked, but is avoided in deser code
 				child.packed = true;
 			}
 		}
