@@ -28,30 +28,30 @@ struct PBChild {
 		if (modifier != "repeated") ret ~= indent~"	_has_"~name~" = true;\n";
 		ret ~= indent~"}\n";
 		if (modifier == "repeated") {
-			ret ~= indent~"bool has_"~name~" () {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"bool has_"~name~" () {\n";
 			ret ~= indent~"	return _"~name~".length?1:0;\n";
 			ret ~= indent~"}\n";
-			ret ~= indent~"void clear_"~name~" () {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"void clear_"~name~" () {\n";
 			ret ~= indent~"	_"~name~" = null;\n";
 			ret ~= indent~"}\n";
 			// technically, they can just do class.item.length
 			// there is no need for this
-			ret ~= indent~"int "~name~"_size () {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"int "~name~"_size () {\n";
 			ret ~= indent~"	return _"~name~".length;\n";
 			ret ~= indent~"}\n";
 			// functions to do additions, both singular and array
-			ret ~= indent~"void add_"~name~" ("~toDType(type)~" __addme) {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"void add_"~name~" ("~toDType(type)~" __addme) {\n";
 			ret ~= indent~"	_"~name~" ~= __addme;\n";
 			ret ~= indent~"}\n";
-			ret ~= indent~"void add_"~name~" ("~toDType(type)~"[]__addme) {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"void add_"~name~" ("~toDType(type)~"[]__addme) {\n";
 			ret ~= indent~"	_"~name~" ~= __addme;\n";
 			ret ~= indent~"}\n";
 		} else {
 			ret ~= indent~"bool _has_"~name~" = false;\n";
-			ret ~= indent~"bool has_"~name~" () {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"bool has_"~name~" () {\n";
 			ret ~= indent~"	return _has_"~name~";\n";
 			ret ~= indent~"}\n";
-			ret ~= indent~"void clear_"~name~" () {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"void clear_"~name~" () {\n";
 			ret ~= indent~"	_has_"~name~" = false;\n";
 			ret ~= indent~"}\n";
 		}
@@ -71,30 +71,30 @@ struct PBChild {
 		if (modifier != "repeated") ret ~= indent~"	_has__exten_"~name~" = true;\n";
 		ret ~= indent~"}\n";
 		if (modifier == "repeated") {
-			ret ~= indent~"bool HasExtension(int T:"~toString(index)~")() {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"bool HasExtension(int T:"~toString(index)~")() {\n";
 			ret ~= indent~"	return __exten_"~name~".length?1:0;\n";
 			ret ~= indent~"}\n";
-			ret ~= indent~"void ClearExtension(int T:"~toString(index)~")() {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"void ClearExtension(int T:"~toString(index)~")() {\n";
 			ret ~= indent~"	__exten_"~name~" = null;\n";
 			ret ~= indent~"}\n";
 			// technically, they can just do class.item.length
 			// there is no need for this
-			ret ~= indent~"int ExtensionSize(int T:"~toString(index)~")() {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"int ExtensionSize(int T:"~toString(index)~")() {\n";
 			ret ~= indent~"	return __exten_"~name~".length;\n";
 			ret ~= indent~"}\n";
 			// functions to do additions, both singular and array
-			ret ~= indent~"void AddExtension(int T:"~toString(index)~")("~toDType(type)~" __addme) {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"void AddExtension(int T:"~toString(index)~")("~toDType(type)~" __addme) {\n";
 			ret ~= indent~"	__exten_"~name~" ~= __addme;\n";
 			ret ~= indent~"}\n";
-			ret ~= indent~"void AddExtension(int T:"~toString(index)~")("~toDType(type)~"[]__addme) {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"void AddExtension(int T:"~toString(index)~")("~toDType(type)~"[]__addme) {\n";
 			ret ~= indent~"	__exten_"~name~" ~= __addme;\n";
 			ret ~= indent~"}\n";
 		} else {
 			ret ~= indent~"bool _has__exten_"~name~" = false;\n";
-			ret ~= indent~"bool HasExtension(int T:"~toString(index)~")() {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"bool HasExtension(int T:"~toString(index)~")() {\n";
 			ret ~= indent~"	return _has__exten_"~name~";\n";
 			ret ~= indent~"}\n";
-			ret ~= indent~"void ClearExtension(int T:"~toString(index)~")() {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"void ClearExtension(int T:"~toString(index)~")() {\n";
 			ret ~= indent~"	_has__exten_"~name~" = false;\n";
 			ret ~= indent~"}\n";
 		}
