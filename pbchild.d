@@ -265,7 +265,7 @@ struct PBChild {
 			indent = indent[0..$-1];
 			ret ~= indent~"static if (is("~type~":Object)) {\n";
 			// no need to worry about packedness here, since it can't be
-			ret ~= indent~"	retobj."~tname~" = "~type~".Deserialize(input,false);\n";
+			ret ~= indent~"	retobj."~tname~" "~(modifier=="repeated"?"~":"")~"= "~type~".Deserialize(input,false);\n";
 			ret ~= indent~"} else {\n";
 			ret ~= indent~"	// this is an enum, almost certainly\n";
 			// worry about packedness here
