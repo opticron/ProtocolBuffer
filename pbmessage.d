@@ -108,9 +108,10 @@ struct PBMessage {
 		// add comments
 		ret ~= indent~"// if we're root, we can assume we own the whole string\n";
 		ret ~= indent~"// if not, the first thing we need to do is pull the length that belongs to us\n";
-		ret ~= indent~"static "~name~" Deserialize(inout byte[]manip,bool isroot=true) {\n";
+		ret ~= indent~"static "~name~" Deserialize(inout byte[]manip,bool isroot=true) {return new "~name~"(manip,isroot);}\n";
+		ret ~= indent~"this(){}\n";
+		ret ~= indent~"this(inout byte[]manip,bool isroot=true) {\n";
 		indent = indent~"	";
-		ret ~= indent~"auto retobj = new "~name~";\n";
 		ret ~= indent~"byte[]input = manip;\n";
 
 		ret ~= indent~"// cut apart the input string\n";
@@ -137,7 +138,7 @@ struct PBMessage {
 		// take care of default case
 		ret ~= indent~"default:\n";
 		ret ~= indent~"	// rip off unknown fields\n";
-		ret ~= indent~"	retobj.ufields ~= _toVarint(header)~ripUField(input,getWireType(header));\n";
+		ret ~= indent~"	ufields ~= _toVarint(header)~ripUField(input,getWireType(header));\n";
 		ret ~= indent~"	break;\n";
 		ret ~= indent~"}\n";
 		indent = indent[0..$-1];
@@ -145,12 +146,11 @@ struct PBMessage {
 
 		// check for required fields
 		foreach(pbchild;child_exten) if (pbchild.modifier == "required") {
-			ret ~= indent~"if (retobj._has__exten_"~pbchild.name~" == false) throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n";
+			ret ~= indent~"if (_has__exten_"~pbchild.name~" == false) throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n";
 		}
 		foreach(pbchild;children) if (pbchild.modifier == "required") {
-			ret ~= indent~"if (retobj._has_"~pbchild.name~" == false) throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n";
+			ret ~= indent~"if (_has_"~pbchild.name~" == false) throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n";
 		}
-		ret ~= indent~"return retobj;\n";
 		indent = indent[0..$-1];
 		ret ~= indent~"}\n";
 		return ret;

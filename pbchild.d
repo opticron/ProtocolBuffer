@@ -238,7 +238,7 @@ struct PBChild {
 		char[]pack;
 		ret ~= indent~"if (getWireType(header) == "~toString(wTFromType(type))~") {\n";
 		indent ~= "	";
-		ret ~= indent~"retobj."~tname~" "~(modifier=="repeated"?"~":"")~"= ";
+		ret ~= indent~tname~" "~(modifier=="repeated"?"~":"")~"= ";
 		bool isobj = false;
 		switch(type) {
 		case "float","double","sfixed32","sfixed64","fixed32","fixed64":
@@ -265,15 +265,15 @@ struct PBChild {
 			indent = indent[0..$-1];
 			ret ~= indent~"static if (is("~type~":Object)) {\n";
 			// no need to worry about packedness here, since it can't be
-			ret ~= indent~"	retobj."~tname~" "~(modifier=="repeated"?"~":"")~"= "~type~".Deserialize(input,false);\n";
+			ret ~= indent~"	"~tname~" "~(modifier=="repeated"?"~":"")~"= "~type~".Deserialize(input,false);\n";
 			ret ~= indent~"} else {\n";
 			ret ~= indent~"	// this is an enum, almost certainly\n";
 			// worry about packedness here
 			ret ~= indent~"	if (getWireType(header) == 0) {\n";
-			ret ~= indent~"		retobj."~tname~" "~(modifier=="repeated"?"~":"")~"= fromVarint!(int)(input);\n";
+			ret ~= indent~"		"~tname~" "~(modifier=="repeated"?"~":"")~"= fromVarint!(int)(input);\n";
 			if (modifier == "repeated") {
 				ret ~= indent~"	} else if (getWireType(header) == 2) {\n";
-				ret ~= indent~"		retobj."~tname~" ~= fromPacked!("~toDType(type)~",fromVarint!(int))(input);\n";
+				ret ~= indent~"		"~tname~" ~= fromPacked!("~toDType(type)~",fromVarint!(int))(input);\n";
 			}
 			ret ~= indent~"	} else {\n";
 			// this is not condoned, wiretype is invalid, so explode!
@@ -286,7 +286,7 @@ struct PBChild {
 			indent = indent[0..$-1];
 			if (modifier == "repeated" && isPackable(type)) {
 				ret ~= indent~"} else if (getWireType(header) == 2) {\n";
-				ret ~= indent~"	retobj."~tname~" ~= fromPacked!("~toDType(type)~","~pack~")(input);\n";
+				ret ~= indent~"	"~tname~" ~= fromPacked!("~toDType(type)~","~pack~")(input);\n";
 			}
 			ret ~= indent~"} else {\n";
 			// this is not condoned, wiretype is invalid, so explode!
@@ -295,7 +295,7 @@ struct PBChild {
 		}
 		// we need to modify this for both required and optional, repeated is taken care of
 		if (modifier != "repeated") {
-			ret ~= indent~"retobj._has"~tname~" = true;\n";
+			ret ~= indent~"_has"~tname~" = true;\n";
 		}
 		// tack on the break so we don't have fallthrough
 		ret ~= indent~"break;\n";
