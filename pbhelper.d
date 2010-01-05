@@ -48,7 +48,7 @@ byte[]_toVarint(long input) {
 	return ret;
 }
 
-T fromVarint(T)(inout byte[]input)
+T fromVarint(T)(ref byte[]input)
 in {
 	assert(input.length);
 } body {
@@ -157,7 +157,7 @@ byte[]toSInt(long input,int field) {
 	return toVarint((input<<1)^(input>>63),field);
 }
 
-T fromSInt(T)(inout byte[]input) {
+T fromSInt(T)(ref byte[]input) {
 	static if (!is(T == int) && !is(T == long)) {
 		throw new Exception("fromSInt only works with types int or long.");
 	}
@@ -205,7 +205,7 @@ byte[]toByteBlob(T)(T input,int field) {
 	return ret;
 }
 
-T fromByteBlob(T)(inout byte[]input)
+T fromByteBlob(T)(ref byte[]input)
 in {
 	assert(input.length >= T.sizeof);
 } body {
@@ -232,7 +232,7 @@ byte[]toByteString(T:T[])(T[]input,int field) {
 	return genHeader(field,2)~tmp~cast(byte[])input;
 }
 
-T[]fromByteString(T:T[])(inout byte[]input) {
+T[]fromByteString(T:T[])(ref byte[]input) {
 	uint len = fromVarint!(uint)(input);
 	if (len > input.length) {
 		throw new Exception("String length exceeds length of input byte array.");
@@ -251,7 +251,7 @@ unittest {
 	debug writefln("");
 }
 
-byte[]ripUField(inout byte[]input,int wiretype) {
+byte[]ripUField(ref byte[]input,int wiretype) {
 	switch(wiretype) {
 	case 0:
 		// snag a varint
@@ -292,7 +292,7 @@ byte[]toPacked(T:T[],alias serializer)(T[]packed,int field) {
 	return ret;
 }
 
-T[]fromPacked(T,alias deserializer)(inout byte[]input) {
+T[]fromPacked(T,alias deserializer)(ref byte[]input) {
 	T[]ret;
 	// it's assumed that the field is already ripped off
 	// grab the length to be decoded

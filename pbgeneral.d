@@ -90,7 +90,7 @@ in {
 }
 
 // this will rip off the next token
-char[]stripValidChars(CClass cc,inout char[]pbstring)
+char[]stripValidChars(CClass cc,ref char[]pbstring)
 in {
 	assert(pbstring.length);
 } body {
@@ -172,7 +172,7 @@ struct PBOption {
 }
 
 // XXX actually do something with options
-PBOption ripOption(inout char[]pbstring,char[]terms = ";") {
+PBOption ripOption(ref char[]pbstring,char[]terms = ";") {
 	// we need to pull apart the option and stuff it in a struct
 	PBOption pbopt;
 	if (pbstring[0] == '(') {
@@ -215,7 +215,7 @@ PBOption ripOption(inout char[]pbstring,char[]terms = ";") {
 	return pbopt;
 }
 
-char[]ripQuotedValue(inout char[]pbstring) {
+char[]ripQuotedValue(ref char[]pbstring) {
 	int x;
 	for(x = 1;pbstring[x] != '"' && x < pbstring.length;x++) {
 	}
@@ -227,7 +227,7 @@ char[]ripQuotedValue(inout char[]pbstring) {
 }
 
 // this rips line-specific options from the string
-PBOption[]ripOptions(inout char[]pbstring) {
+PBOption[]ripOptions(ref char[]pbstring) {
 	PBOption[]ret;
 	while(pbstring.length && pbstring[0] != ']') {
 		// this will rip off the leading [ and intermediary ','s

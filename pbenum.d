@@ -20,7 +20,7 @@ struct PBEnum {
 	}
 
 	// string-modifying constructor
-	static PBEnum opCall(inout char[]pbstring)
+	static PBEnum opCall(ref char[]pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
@@ -55,7 +55,7 @@ struct PBEnum {
 		return pbenum;
 	}
 
-	void grabEnumValue(inout char[]pbstring)
+	void grabEnumValue(ref char[]pbstring)
 	in {
 		assert(pbstring.length);
 	} body {

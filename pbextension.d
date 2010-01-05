@@ -10,7 +10,7 @@ struct PBExtension {
 	PBChild[]children;
 
 	// string-modifying constructor
-	static PBExtension opCall(inout char[]pbstring)
+	static PBExtension opCall(ref char[]pbstring)
 	in {
 		assert(pbstring.length);
 	} body {

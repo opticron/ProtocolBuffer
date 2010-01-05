@@ -63,7 +63,7 @@ struct PBMessage {
 		// deal with what little we need to do for extensions
 		retstr ~= extensions.genExtString(indent~"static ");
 		// include a static opcall to do deserialization to make coding simpler
-		retstr ~= indent~"static "~name~" opCall(inout byte[]input) {\n";
+		retstr ~= indent~"static "~name~" opCall(ref byte[]input) {\n";
 		retstr ~= indent~"	return Deserialize(input);\n";
 		retstr ~= indent~"}\n";
 		
@@ -108,9 +108,9 @@ struct PBMessage {
 		// add comments
 		ret ~= indent~"// if we're root, we can assume we own the whole string\n";
 		ret ~= indent~"// if not, the first thing we need to do is pull the length that belongs to us\n";
-		ret ~= indent~"static "~name~" Deserialize(inout byte[]manip,bool isroot=true) {return new "~name~"(manip,isroot);}\n";
+		ret ~= indent~"static "~name~" Deserialize(ref byte[]manip,bool isroot=true) {return new "~name~"(manip,isroot);}\n";
 		ret ~= indent~"this(){}\n";
-		ret ~= indent~"this(inout byte[]manip,bool isroot=true) {\n";
+		ret ~= indent~"this(ref byte[]manip,bool isroot=true) {\n";
 		indent = indent~"	";
 		ret ~= indent~"byte[]input = manip;\n";
 
@@ -157,7 +157,7 @@ struct PBMessage {
 	}
 
 	// string-modifying constructor
-	static PBMessage opCall(inout char[]pbstring)
+	static PBMessage opCall(ref char[]pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
@@ -236,7 +236,7 @@ struct PBMessage {
 		return ret;
 	}
 
-	void ripExtenRange(inout char[]pbstring) {
+	void ripExtenRange(ref char[]pbstring) {
 		pbstring = pbstring["extensions".length..$];
 		pbstring = stripLWhite(pbstring);
 		allow_exten ext;
@@ -304,7 +304,7 @@ unittest {
 		}
 		// if we're root, we can assume we own the whole string
 		// if not, the first thing we need to do is pull the length that belongs to us
-		static simple Deserialize(inout byte[]manip,bool isroot=true) {
+		static simple Deserialize(ref byte[]manip,bool isroot=true) {
 			auto retobj = new simple;
 			byte[]input = manip;
 			// cut apart the input string
@@ -326,7 +326,7 @@ unittest {
 		}
 		void MergeFrom(simple merger) {
 		}
-		static simple opCall(inout byte[]input) {
+		static simple opCall(ref byte[]input) {
 			return Deserialize(input);
 		}
 	}
@@ -378,7 +378,7 @@ unittest {
 	}
 	// if we're root, we can assume we own the whole string
 	// if not, the first thing we need to do is pull the length that belongs to us
-	static glorm Deserialize(inout byte[]manip,bool isroot=true) {
+	static glorm Deserialize(ref byte[]manip,bool isroot=true) {
 		auto retobj = new glorm;
 		byte[]input = manip;
 		// cut apart the input string
@@ -423,7 +423,7 @@ unittest {
 		if (merger.has_i32test) i32test = merger.i32test;
 		if (merger.has_quack) quack = merger.quack;
 	}
-	static glorm opCall(inout byte[]input) {
+	static glorm opCall(ref byte[]input) {
 		return Deserialize(input);
 	}
 }

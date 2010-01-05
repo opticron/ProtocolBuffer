@@ -32,7 +32,7 @@ struct PBRoot {
 	}
 
 	// this should leave nothing in the string you pass in
-	static PBRoot opCall(inout char[]pbstring)
+	static PBRoot opCall(ref char[]pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
@@ -83,7 +83,7 @@ struct PBRoot {
 		return root;
 	}
 
-	static char[]parsePackage(inout char[]pbstring)
+	static char[]parsePackage(ref char[]pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
@@ -192,7 +192,7 @@ class Person {
 		}
 		// if we're root, we can assume we own the whole string
 		// if not, the first thing we need to do is pull the length that belongs to us
-		static PhoneNumber Deserialize(inout byte[]manip,bool isroot=true) {
+		static PhoneNumber Deserialize(ref byte[]manip,bool isroot=true) {
 			auto retobj = new PhoneNumber;
 			byte[]input = manip;
 			// cut apart the input string
@@ -231,7 +231,7 @@ class Person {
 			if (merger.has_number) number = merger.number;
 			if (merger.has_type) type = merger.type;
 		}
-		static PhoneNumber opCall(inout byte[]input) {
+		static PhoneNumber opCall(ref byte[]input) {
 			return Deserialize(input);
 		}
 	}
@@ -324,7 +324,7 @@ class Person {
 	}
 	// if we're root, we can assume we own the whole string
 	// if not, the first thing we need to do is pull the length that belongs to us
-	static Person Deserialize(inout byte[]manip,bool isroot=true) {
+	static Person Deserialize(ref byte[]manip,bool isroot=true) {
 		auto retobj = new Person;
 		byte[]input = manip;
 		// cut apart the input string
@@ -377,7 +377,7 @@ class Person {
 		if (merger.has_email) email = merger.email;
 		if (merger.has_phone) add_phone(merger.phone);
 	}
-	static Person opCall(inout byte[]input) {
+	static Person opCall(ref byte[]input) {
 		return Deserialize(input);
 	}
 }

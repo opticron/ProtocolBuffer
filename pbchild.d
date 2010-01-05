@@ -101,7 +101,7 @@ struct PBChild {
 		return ret;
 	}
 
-	static PBChild opCall(inout char[]pbstring)
+	static PBChild opCall(ref char[]pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
