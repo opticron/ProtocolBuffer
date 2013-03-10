@@ -2,18 +2,21 @@
 // required to parse a protocol buffer file or tree and generate
 // code to read and write the specified format
 module ProtocolBuffer.pbmessage;
+
 import ProtocolBuffer.pbgeneral;
 import ProtocolBuffer.pbenum;
 import ProtocolBuffer.pbchild;
 import ProtocolBuffer.pbextension;
-import std.string;
+
+import std.conv;
 import std.stdio;
+import std.string;
 
 // I intentionally left out all identifier validation routines, because the compiler knows how to resolve symbols. 
 // This means I don't have to write that code. 
 
 struct PBMessage {
-	char[]name;
+	string name;
 	// message definitions that actually occur within this message
 	PBMessage[]message_defs;
 	// enum definitions that actually occur within this message
@@ -32,8 +35,8 @@ struct PBMessage {
 	allow_exten[]exten_sets;
 	// XXX need to support options correctly 
 	// XXX need to support services at some point 
-	char[]toDString(char[]indent) {
-		char[]retstr = "";
+	string toDString(string indent) {
+		string retstr = "";
 		retstr ~= indent~(indent.length?"static ":"")~"class "~name~" {\n";
 		indent = indent~"	";
 		retstr ~= indent~"// deal with unknown fields\n";
@@ -73,8 +76,8 @@ struct PBMessage {
 		return retstr;
 	}
 
-	char[]genSerCode(char[]indent) {
-		char[]ret = "";
+	string genSerCode(string indent) {
+		string ret = "";
 		// use -1 as a default value, since a nibble can not produce that number
 		ret ~= indent~"byte[]Serialize(int field = -1) {\n";
 		indent = indent~"	";
@@ -103,8 +106,8 @@ struct PBMessage {
 		return ret;
 	}
 
-	char[]genDesCode(char[]indent) {
-		char[]ret = "";
+	string genDesCode(string indent) {
+		string ret = "";
 		// add comments
 		ret ~= indent~"// if we're root, we can assume we own the whole string\n";
 		ret ~= indent~"// if not, the first thing we need to do is pull the length that belongs to us\n";
@@ -157,7 +160,7 @@ struct PBMessage {
 	}
 
 	// string-modifying constructor
-	static PBMessage opCall(ref char[]pbstring)
+	static PBMessage opCall(ref string pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
@@ -167,7 +170,7 @@ struct PBMessage {
 		// now rip off the next set of whitespace
 		pbstring = stripLWhite(pbstring);
 		// get message name
-		char[]name = stripValidChars(CClass.Identifier,pbstring);
+		string name = stripValidChars(CClass.Identifier,pbstring);
 		PBMessage message;
 		message.name = name;
 		// rip off whitespace
@@ -221,8 +224,8 @@ struct PBMessage {
 		return message;
 	}
 
-	char[]genMergeCode(char[]indent) {
-		char[]ret;
+	string genMergeCode(string indent) {
+		string ret;
 		ret ~= indent~"void MergeFrom("~name~" merger) {\n";
 		indent = indent~"	";
 		// merge code
@@ -236,14 +239,14 @@ struct PBMessage {
 		return ret;
 	}
 
-	void ripExtenRange(ref char[]pbstring) {
+	void ripExtenRange(ref string pbstring) {
 		pbstring = pbstring["extensions".length..$];
 		pbstring = stripLWhite(pbstring);
 		allow_exten ext;
 		// expect next to be numeric
-		char[]tmp = stripValidChars(CClass.Numeric,pbstring);
+		string tmp = stripValidChars(CClass.Numeric,pbstring);
 		if (!tmp.length) throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range");
-		ext.min = cast(int)atoi(tmp);
+		ext.min = to!int(tmp);
 		pbstring = stripLWhite(pbstring);
 		// make sure we have "to"
 		if (pbstring[0..2].icmp("to") != 0) {
@@ -260,7 +263,7 @@ struct PBMessage {
 		} else {
 			tmp = stripValidChars(CClass.Numeric,pbstring);
 			if (!tmp.length) throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range");
-			ext.max = cast(int)atoi(tmp);
+			ext.max = to!int(tmp);
 			if (ext.max > (1<<29)-1) {
 				throw new PBParseException("Message Parse("~name~" extension range)","Max defined extension value is greater than allowable max");
 			}
@@ -275,18 +278,18 @@ struct PBMessage {
 	}
 }
 
-char[]genExtString(PBExtension[]extens,char[]indent) {
+string genExtString(PBExtension[]extens,string indent) {
 	// we just need to generate a list of static const variables
-	char[]ret;
+	string ret;
 	foreach(exten;extens) foreach(child;exten.children) {
-		ret ~= indent~"const int "~child.name~" = "~toString(child.index)~";\n";
+		ret ~= indent~"const int "~child.name~" = "~to!string(child.index)~";\n";
 	}
 	return ret;
 }
 
 unittest {
-	char[]instring = "message glorm{\noptional int32 i32test = 1;\nmessage simple { }\noptional simple quack = 5;\n}\n";
-	char[]compstr = 
+	string instring = "message glorm{\noptional int32 i32test = 1;\nmessage simple { }\noptional simple quack = 5;\n}\n";
+	string compstr = 
 "class glorm {
 	// deal with unknown fields
 	byte[]ufields;
@@ -394,7 +397,7 @@ unittest {
 				if (getWireType(header) == 0) {
 					retobj._i32test = fromVarint!(int)(input);
 				} else {
-					throw new Exception(\"Invalid wiretype \"~std.string.toString(getWireType(header))~\" for variable type int32\");
+					throw new Exception(\"Invalid wiretype \"~std.conv.to!string(getWireType(header))~\" for variable type int32\");
 				}
 				retobj._has_i32test = true;
 				break;
@@ -406,7 +409,7 @@ unittest {
 					if (getWireType(header) == 0) {
 						retobj._quack = fromVarint!(int)(input);
 					} else {
-						throw new Exception(\"Invalid wiretype \"~std.string.toString(getWireType(header))~\" for variable type simple\");
+						throw new Exception(\"Invalid wiretype \"~std.conv.to!string(getWireType(header))~\" for variable type simple\");
 					}
 				}
 				retobj._has_quack = true;

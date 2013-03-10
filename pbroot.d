@@ -12,11 +12,11 @@ import std.stdio;
 struct PBRoot {
 	PBMessage[]message_defs;
 	PBEnum[]enum_defs;
-	char[][]imports;
-	char[]Package;
+	string []imports;
+	string Package;
 	PBExtension[]extensions;
-	char[]toDString(char[]indent="") {
-		char[]retstr = "";
+	string toDString(string indent="") {
+		string retstr = "";
 		retstr ~= "import ProtocolBuffer.pbhelper;\n";
 		// do what we need for extensions defined here
 		retstr ~= extensions.genExtString(indent);
@@ -32,7 +32,7 @@ struct PBRoot {
 	}
 
 	// this should leave nothing in the string you pass in
-	static PBRoot opCall(ref char[]pbstring)
+	static PBRoot opCall(ref string pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
@@ -83,7 +83,7 @@ struct PBRoot {
 		return root;
 	}
 
-	static char[]parsePackage(ref char[]pbstring)
+	static string parsePackage(ref string pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
@@ -91,7 +91,7 @@ struct PBRoot {
 		// strip any whitespace before the package name
 		pbstring = stripLWhite(pbstring);
 		// the next part of the string should be the package name up until the semicolon
-		char[]Package = stripValidChars(CClass.MultiIdentifier,pbstring);
+		string Package = stripValidChars(CClass.MultiIdentifier,pbstring);
 		// rip out any whitespace that might be here for some strange reason
 		pbstring = stripLWhite(pbstring);
 		// make sure the next character is a semicolon...
@@ -109,7 +109,7 @@ struct PBRoot {
 
 
 unittest {
-	char[]pbstr = "   
+	string pbstr = "
 package myfirstpackage;
 // my comments hopefully won't explode anything
 	message Person {required string name= 1;
@@ -131,7 +131,7 @@ package myfirstpackage;
 }
 //especially here    
 ";
-	char[]compstr = 
+	string compstr =
 "import ProtocolBuffer.pbhelper;
 class Person {
 	// deal with unknown fields
@@ -144,11 +144,11 @@ class Person {
 	static class PhoneNumber {
 		// deal with unknown fields
 		byte[]ufields;
-		char[] _number;
-		char[] number() {
+		string  _number;
+		string  number() {
 			return _number;
 		}
-		void number(char[] input_var) {
+		void number(string  input_var) {
 			_number = input_var;
 			_has_number = true;
 		}
@@ -206,7 +206,7 @@ class Person {
 				input = input[1..$];
 				switch(getFieldNumber(header)) {
 				case 1:
-					retobj._number = fromByteString!(char[])(input);
+					retobj._number = fromByteString!(string )(input);
 					retobj._has_number = true;
 					break;
 					case 2:
@@ -235,11 +235,11 @@ class Person {
 			return Deserialize(input);
 		}
 	}
-	char[] _name;
-	char[] name() {
+	string  _name;
+	string  name() {
 		return _name;
 	}
-	void name(char[] input_var) {
+	void name(string  input_var) {
 		_name = input_var;
 		_has_name = true;
 	}
@@ -265,11 +265,11 @@ class Person {
 	void clear_id () {
 		_has_id = false;
 	}
-	char[] _email;
-	char[] email() {
+	string  _email;
+	string  email() {
 		return _email;
 	}
-	void email(char[] input_var) {
+	void email(string  input_var) {
 		_email = input_var;
 		_has_email = true;
 	}
@@ -338,7 +338,7 @@ class Person {
 			input = input[1..$];
 			switch(getFieldNumber(header)) {
 			case 1:
-				retobj._name = fromByteString!(char[])(input);
+				retobj._name = fromByteString!(string )(input);
 				retobj._has_name = true;
 				break;
 			case 2:
@@ -346,7 +346,7 @@ class Person {
 				retobj._has_id = true;
 				break;
 			case 3:
-				retobj._email = fromByteString!(char[])(input);
+				retobj._email = fromByteString!(string )(input);
 				retobj._has_email = true;
 				break;
 				case 4:

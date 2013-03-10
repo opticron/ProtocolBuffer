@@ -3,24 +3,26 @@
 // code to read and write the specified format
 module ProtocolBuffer.pbenum;
 import ProtocolBuffer.pbgeneral;
-import std.string;
+import std.conv;
 import std.stdio;
+import std.string;
+version(unittest) import std.regex;
 
 struct PBEnum {
-	char[]name;
-	char[][int]values;
-	char[]toDString(char[]indent) {
-		char[]retstr = "";
+	string name;
+	string[int] values;
+	string toDString(string indent) {
+		string retstr = "";
 		retstr ~= indent~"enum "~name~" {\n";
 		foreach (key,value;values) {
-			retstr ~= indent~"	"~value~" = "~toString(key)~",\n";
+			retstr ~= indent~"	"~value~" = "~to!string(key)~",\n";
 		}
 		retstr ~= indent~"}\n";
 		return retstr;
 	}
 
 	// string-modifying constructor
-	static PBEnum opCall(ref char[]pbstring)
+	static PBEnum opCall(ref string pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
@@ -55,13 +57,13 @@ struct PBEnum {
 		return pbenum;
 	}
 
-	void grabEnumValue(ref char[]pbstring)
+	void grabEnumValue(ref string pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
 		// whitespace has already been ripped
 		// snag item name
-		char[]tmp = stripValidChars(CClass.Identifier,pbstring);
+		string tmp = stripValidChars(CClass.Identifier,pbstring);
 		if (!tmp.length) throw new PBParseException("Enum Definition("~name~")","Could not pull item name from definition.");
 		if (!validIdentifier(tmp)) throw new PBParseException("Enum Definition("~name~")","Invalid item name identifier "~tmp~".");
 		// check for options
@@ -78,9 +80,9 @@ struct PBEnum {
 		pbstring = pbstring[1..$];
 		pbstring = stripLWhite(pbstring);
 		// now parse a numeric
-		char[]num = stripValidChars(CClass.Numeric,pbstring);
+		string num = stripValidChars(CClass.Numeric,pbstring);
 		if (!num.length) throw new PBParseException("Enum Definition("~name~"."~tmp~")","Could not pull numeric enum value.");
-		values[cast(int)atoi(num)] = tmp;
+		values[to!int(num)] = tmp;
 		pbstring = stripLWhite(pbstring);
 		// deal with inline options
 		if (pbstring[0] == '[') {
@@ -99,10 +101,12 @@ struct PBEnum {
 unittest {
 	writefln("unittest ProtocolBuffer.pbenum");
 	// the leading whitespace is assumed to already have been stripped
-	char[]estring = "enum potato {TOTALS = 1;JUNK= 5 ; ALL =3;}";
+	string estring = "enum potato {TOTALS = 1;JUNK= 5 ; ALL =3;}";
 	auto edstring = PBEnum(estring).toDString("");
 	debug writefln("%s",edstring);
-	assert(edstring == "enum potato {\n	TOTALS = 1,\n	ALL = 3,\n	JUNK = 5,\n}\n");
+    assert(edstring.match(regex(r"TOTALS = 1")).empty == false);
+    assert(edstring.match(regex(r"ALL = 3")).empty == false);
+    assert(edstring.match(regex(r"JUNK = 5")).empty == false);
 	debug writefln("");
 }
 

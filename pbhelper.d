@@ -1,6 +1,11 @@
 module ProtocolBuffer.pbhelper;
+
+import std.conv;
 import std.stdio;
 import std.string;
+import std.traits;
+version(unittest) import std.algorithm, std.range;
+
 // here is where all the encodings are defined and translated between bytes and real representations
 
 // varint translation code
@@ -58,9 +63,9 @@ in {
 	for (x = 0;x<=input.length;x++) {
 		if (x == input.length) throw new Exception(
 			"Found no end to varint byte string starting with: "~
-			toString(cast(ulong)input[0],16u)~" "~
-			(input.length>1?toString(cast(ulong)input[1],16u):"")~" "~
-			(input.length>2?toString(cast(ulong)input[2],16u):""));
+			to!string(cast(ulong)input[0],16u)~" "~
+			(input.length>1?to!string(cast(ulong)input[1],16u):"")~" "~
+			(input.length>2?to!string(cast(ulong)input[2],16u):""));
 
 		if (!(input[x]>>7)) {
 			// we have a byte with an unset upper bit! huzzah!
@@ -72,7 +77,7 @@ in {
 	}
 
 	long output = 0;
-	for (x = tmp.length-1;x>=0;x--) {
+	for (x = to!int(tmp.length-1);x>=0;x--) {
 		output |= (tmp[x]&0b1111111);
 		if (x==0) {
 			// we're done, so jump out so we can return values
@@ -226,7 +231,8 @@ unittest {
 }
 
 // string functions!
-byte[]toByteString(T:T[])(T[]input,int field) {
+byte[]toByteString(T)(T[]input,int field)
+    if(is(Unqual!T == char) || is(Unqual!T == byte)) {
 	// we need to rip off the generated header byte for code reuse, this could be done better
 	byte[]tmp = _toVarint(input.length);
 	return genHeader(field,2)~tmp~cast(byte[])input;
@@ -244,9 +250,9 @@ T[]fromByteString(T:T[])(ref byte[]input) {
 
 unittest {
 	writefln("unittest ProtocolBuffer.pbhelper.byteblobs");
-	char[]test = "My toast has been stolen!";
-	byte[]tmp = toByteString!(char[])(test,cast(byte)15)[1..$];
-	assert(test == fromByteString!(char[])(tmp));
+	string test = "My toast has been stolen!";
+	byte[]tmp = toByteString!(string )(test,cast(byte)15)[1..$];
+	assert(test == fromByteString!(string )(tmp));
 	assert(tmp.length == 0);
 	debug writefln("");
 }
@@ -273,9 +279,9 @@ byte[]ripUField(ref byte[]input,int wiretype) {
 		return tmp;
 	default:
 		// shit is broken....
-		throw new Exception("Can't deal with wiretype "~toString(wiretype));
+		throw new Exception("Can't deal with wiretype "~to!string(wiretype));
 	}
-	throw new Exception("Wiretype "~toString(wiretype)~" fell through switch");
+	throw new Exception("Wiretype "~to!string(wiretype)~" fell through switch");
 }
 
 // handle packed fields
@@ -313,8 +319,8 @@ unittest {
 	byte[]cmp = cast(byte[])[0x22,0x6,0x3,0x8e,0x2,0x9e,0xa7,0x5];
 	byte[]tmp = toPacked!(int[],toVarint)(test,cast(byte)4);
 	assert(tmp.length == 8);
-	debug writefln("%x",cmp);
-	debug writefln("%x",tmp);
+	debug writeln(map!(a => format("%x", a))(cmp));
+	debug writeln(map!(a => format("%x", a))(tmp));
 	assert(tmp == cmp);
 	// rip off header byte
 	tmp = tmp[1..$];

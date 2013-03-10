@@ -6,11 +6,11 @@ import std.string;
 import std.stdio;
 
 struct PBExtension {
-	char[]name;
+	string name;
 	PBChild[]children;
 
 	// string-modifying constructor
-	static PBExtension opCall(ref char[]pbstring)
+	static PBExtension opCall(ref string pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
@@ -20,7 +20,7 @@ struct PBExtension {
 		// now rip off the next set of whitespace
 		pbstring = stripLWhite(pbstring);
 		// get message name
-		char[]name = stripValidChars(CClass.MultiIdentifier,pbstring);
+		string name = stripValidChars(CClass.MultiIdentifier,pbstring);
 		PBExtension exten;
 		exten.name = name;
 		// rip off whitespace
@@ -47,7 +47,7 @@ struct PBExtension {
 }
 
 unittest {
-	char[]instr = 
+	string instr =
 "extend Foo {
 	optional clunker blah = 1;
 }

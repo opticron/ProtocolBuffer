@@ -2,8 +2,11 @@
 // required to parse a protocol buffer file or tree and generate
 // code to read and write the specified format
 module ProtocolBuffer.pbgeneral;
-import std.string;
+import std.algorithm;
+import std.range;
 import std.stdio;
+import std.string;
+import std.uni;
 
 enum PBTypes {
 	PB_Package=1,
@@ -28,11 +31,11 @@ enum CClass {
 	Comment,
 }
 
-bool validateMultiIdentifier(char[]ident)
+bool validateMultiIdentifier(string ident)
 in {
 	assert(ident.length);
 } body {
-	char[][]parts = split(ident,".");
+	string[] parts = split(ident,".");
 	foreach(part;parts) {
 		if (!part.length) return false;
 		if (!validIdentifier(part)) return false;
@@ -41,9 +44,9 @@ in {
 }
 
 class PBParseException:Exception {
-	char[]locus;
-	char[]error;
-	this(char[]location,char[]problem) {
+	string locus;
+	string error;
+	this(string location,string problem) {
 		locus = location;
 		error = problem;
 		super(locus~": "~error);
@@ -51,14 +54,14 @@ class PBParseException:Exception {
 }
 
 
-PBTypes typeNextElement(in char[]pbstring)
+PBTypes typeNextElement(in string pbstring)
 in {
 	assert(pbstring.length);
 } body {
 	// we want to check for // type comments here, since there doesn't necessarily have to be a space after the opener
 	if (pbstring.length>1 && pbstring[0..2] == "//") return PBTypes.PB_Comment;
 	int i=0;
-	for(;i<pbstring.length && !iswhite(pbstring[i]);i++){}
+	for(;i<pbstring.length && !isWhite(pbstring[i]);i++){}
 	auto type = pbstring[0..i];
 	switch(type) {
 	case "package":
@@ -90,13 +93,13 @@ in {
 }
 
 // this will rip off the next token
-char[]stripValidChars(CClass cc,ref char[]pbstring)
+string stripValidChars(CClass cc,ref string pbstring)
 in {
 	assert(pbstring.length);
 } body {
 	int i=0;
 	for(;i<pbstring.length && isValidChar(cc,pbstring[i]);i++){}
-	char[]tmp = pbstring[0..i];
+	string tmp = pbstring[0..i];
 	pbstring = pbstring[i..$];
 	return tmp;
 }
@@ -123,7 +126,7 @@ bool isValidChar(CClass cc,char pc) {
 	throw new PBParseException("Name Validation","PBType fell through the switch.");
 }
 
-bool validIdentifier(char[]ident)
+bool validIdentifier(string ident)
 in {
 	assert(ident.length);
 } body {
@@ -131,7 +134,7 @@ in {
 	return true;
 }
 
-char[] stripLWhite(char[] s)
+string  stripLWhite(string  s)
 in {
 	assert(s.length);
 } body {
@@ -139,7 +142,7 @@ in {
 
     for (i = 0; i < s.length; i++)
     {
-        if (!iswhite(s[i]))
+        if (!isWhite(s[i]))
             break;
     }
     return s[i .. s.length];
@@ -154,7 +157,7 @@ unittest {
 	assert(!validIdentifier("8asdf"));
 	// also takes care of isValidChar
 	debug writefln("Checking stripValidChars...");
-	char[]tmp = "asdf1 yarrr";
+	string tmp = "asdf1 yarrr";
 	assert(stripValidChars(CClass.Identifier,tmp) == "asdf1");
 	assert(tmp == " yarrr");
 	tmp = "as2f.ya7rr -adfbads25737";
@@ -165,14 +168,14 @@ unittest {
 }
 
 struct PBOption {
-	char[]name;
-	char[]subident;
-	char[]value;
+	string name;
+	string subident;
+	string value;
 	bool extension = false;
 }
 
 // XXX actually do something with options
-PBOption ripOption(ref char[]pbstring,char[]terms = ";") {
+PBOption ripOption(ref string pbstring,string terms = ";") {
 	// we need to pull apart the option and stuff it in a struct
 	PBOption pbopt;
 	if (pbstring[0] == '(') {
@@ -204,30 +207,30 @@ PBOption ripOption(ref char[]pbstring,char[]terms = ";") {
 	if (pbstring[0] == '"') {
 		pbopt.value = ripQuotedValue(pbstring);
 		pbstring = stripLWhite(pbstring);
-		if (terms.find(pbstring[0]) == -1) throw new PBParseException("Option Parse("~pbopt.name~")","Malformed option: Bad terminator("~pbstring[0]~")");
+		if (terms.find(pbstring[0]).empty) throw new PBParseException("Option Parse("~pbopt.name~")","Malformed option: Bad terminator("~pbstring[0]~")");
 		// leave the terminator in the string in case the caller wants to look at it
 		return pbopt;
 	}
 	// take care of non-quoted values
 	pbopt.value = stripValidChars(CClass.Identifier,pbstring);
 	pbstring = stripLWhite(pbstring);
-	if (terms.find(pbstring[0]) == -1) throw new PBParseException("Option Parse("~pbopt.name~")","Malformed option: Bad terminator("~pbstring[0]~")");
+	if (terms.find(pbstring[0]).empty) throw new PBParseException("Option Parse("~pbopt.name~")","Malformed option: Bad terminator("~pbstring[0]~")");
 	return pbopt;
 }
 
-char[]ripQuotedValue(ref char[]pbstring) {
+string ripQuotedValue(ref string pbstring) {
 	int x;
 	for(x = 1;pbstring[x] != '"' && x < pbstring.length;x++) {
 	}
 	// inc to take the quotes with us
 	x++;
-	char[]tmp = pbstring[0..x];
+	string tmp = pbstring[0..x];
 	pbstring = pbstring[x..$];
 	return tmp;
 }
 
 // this rips line-specific options from the string
-PBOption[]ripOptions(ref char[]pbstring) {
+PBOption[]ripOptions(ref string pbstring) {
 	PBOption[]ret;
 	while(pbstring.length && pbstring[0] != ']') {
 		// this will rip off the leading [ and intermediary ','s
