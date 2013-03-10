@@ -162,13 +162,13 @@ struct PBMessage {
 	}
 
 	// string-modifying constructor
-	static PBMessage opCall(ref string pbstring)
+	static PBMessage opCall(ref ParserData pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
 		// things we currently support in a message: messages, enums, and children(repeated, required, optional)
 		// first things first, rip off "message"
-		pbstring.skipOver("message");
+		pbstring.input.skipOver("message");
 		// now rip off the next set of whitespace
 		pbstring = stripLWhite(pbstring);
 		// get message name
@@ -179,10 +179,10 @@ struct PBMessage {
 		pbstring = stripLWhite(pbstring);
 		// make sure the next character is the opening {
 		if (pbstring[0] != '{') {
-			throw new PBParseException("Message Definition","Expected next character to be '{'. You may have a space in your message name: "~name);
+			throw new PBParseException("Message Definition","Expected next character to be '{'. You may have a space in your message name: "~name, pbstring.line);
 		}
 		// rip off opening {
-		pbstring.popFront();
+		pbstring.input.popFront();
 		// prep for loop spinup by removing extraneous whitespace
 		pbstring = stripLWhite(pbstring);
 		// now we're ready to enter the loop and parse children
@@ -212,11 +212,12 @@ struct PBMessage {
 				break;
 			case PBTypes.PB_Option:
 				// rip of "option" and leading whitespace
-				pbstring = stripLWhite(pbstring["option".length..$]);
+                pbstring.input.skipOver("option");
+				pbstring = stripLWhite(pbstring);
 				ripOption(pbstring);
 				break;
 			default:
-				throw new PBParseException("Message Definition","Only extend, service, package, and message are allowed here.");
+				throw new PBParseException("Message Definition","Only extend, service, package, and message are allowed here.", pbstring.line);
 			}
 			// this needs to stay at the end
 			pbstring = stripLWhite(pbstring);
@@ -241,18 +242,18 @@ struct PBMessage {
 		return ret;
 	}
 
-	void ripExtenRange(ref string pbstring) {
+	void ripExtenRange(ref ParserData pbstring) {
 		pbstring = pbstring["extensions".length..$];
 		pbstring = stripLWhite(pbstring);
 		allow_exten ext;
 		// expect next to be numeric
 		string tmp = stripValidChars(CClass.Numeric,pbstring);
-		if (!tmp.length) throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range");
+		if (!tmp.length) throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range", pbstring.line);
 		ext.min = to!int(tmp);
 		pbstring = stripLWhite(pbstring);
 		// make sure we have "to"
 		if (pbstring[0..2].icmp("to") != 0) {
-			throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range");
+			throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range", pbstring.line);
 		}
 		// rip of "to"
 		pbstring = pbstring[2..$];
@@ -264,16 +265,16 @@ struct PBMessage {
 			ext.max = (1<<29)-1;
 		} else {
 			tmp = stripValidChars(CClass.Numeric,pbstring);
-			if (!tmp.length) throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range");
+			if (!tmp.length) throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range", pbstring.line);
 			ext.max = to!int(tmp);
 			if (ext.max > (1<<29)-1) {
-				throw new PBParseException("Message Parse("~name~" extension range)","Max defined extension value is greater than allowable max");
+				throw new PBParseException("Message Parse("~name~" extension range)","Max defined extension value is greater than allowable max", pbstring.line);
 			}
 		}
 		pbstring = stripLWhite(pbstring);
 		// check for ; and rip it off
 		if (pbstring[0] != ';') {
-			throw new PBParseException("Message Parse("~name~" extension range)","Missing ; at end of extension range definition");
+			throw new PBParseException("Message Parse("~name~" extension range)","Missing ; at end of extension range definition", pbstring.line);
 		}
 		pbstring = pbstring[1..$];
 		exten_sets ~= ext;
@@ -290,9 +291,9 @@ string genExtString(PBExtension[]extens,string indent) {
 }
 
 unittest {
-	enum instring = "message glorm{\noptional int32 i32test = 1;\nmessage simple { }\noptional simple quack = 5;\n}\n";
+	enum instring = ParserData("message glorm{\noptional int32 i32test = 1;\nmessage simple { }\noptional simple quack = 5;\n}\n");
 
-    PBMessage PBCompileTime(string pbstring) {
+    PBMessage PBCompileTime(ParserData pbstring) {
         return PBMessage(pbstring);
     }
 

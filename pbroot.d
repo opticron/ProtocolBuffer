@@ -6,6 +6,9 @@ import ProtocolBuffer.pbgeneral;
 import ProtocolBuffer.pbmessage;
 import ProtocolBuffer.pbenum;
 import ProtocolBuffer.pbextension;
+
+import std.algorithm;
+import std.range;
 import std.string;
 import std.stdio;
 
@@ -31,15 +34,15 @@ struct PBRoot {
 		return retstr;
 	}
 
-	// this should leave nothing in the string you pass in
-	static PBRoot opCall(ref string pbstring)
+	static PBRoot opCall(string input)
 	in {
-		assert(pbstring.length);
+		assert(!input.empty);
 	} body {
-		// loop until the string is gone
 		PBRoot root;
+        auto pbstring = ParserData(input);
 		// rip off whitespace before looking for the next definition
 		pbstring = stripLWhite(pbstring);
+		// loop until the string is gone
 		while(pbstring.length) {
 			switch(typeNextElement(pbstring)){
 			case PBTypes.PB_Package:
@@ -59,31 +62,33 @@ struct PBRoot {
 				break;
 			case PBTypes.PB_Option:
 				// rip of "option" and leading whitespace
-				pbstring = stripLWhite(pbstring["option".length..$]);
+                pbstring.input.skipOver("option");
+				pbstring = stripLWhite(pbstring);
 				ripOption(pbstring);
 				break;
 			case PBTypes.PB_Import:
 				pbstring = pbstring["import".length..$];
 				pbstring = stripLWhite(pbstring);
-				if (pbstring[0] != '"') throw new PBParseException("Root Definition("~root.Package~")","Imports must be quoted");
+				if (pbstring[0] != '"') throw new PBParseException("Root Definition("~root.Package~")","Imports must be quoted", pbstring.line);
 				// save imports for use by the compiler code
 				root.imports ~= ripQuotedValue(pbstring)[1..$-1];
 				// ensure that the ; is removed
 				pbstring = stripLWhite(pbstring);
-				if (pbstring[0] != ';') throw new PBParseException("Root Definition("~root.Package~")","Missing ; after import \""~root.imports[$-1]~"\"");
+				if (pbstring[0] != ';') throw new PBParseException("Root Definition("~root.Package~")","Missing ; after import \""~root.imports[$-1]~"\"", pbstring.line);
 				pbstring = pbstring[1..$];
 				pbstring = stripLWhite(pbstring);
 				break;
 			default:
-				throw new PBParseException("Root Definition("~root.Package~")","Either there's a definition here that isn't supported, or the definition isn't allowed here");
+				throw new PBParseException("Root Definition("~root.Package~")","Either there's a definition here that isn't supported, or the definition isn't allowed here", pbstring.line);
 			}
 			// rip off whitespace before looking for the next definition
+			// this needs to stay at the end
 			pbstring = stripLWhite(pbstring);
 		}
 		return root;
 	}
 
-	static string parsePackage(ref string pbstring)
+	static string parsePackage(ref ParserData pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
@@ -96,12 +101,12 @@ struct PBRoot {
 		pbstring = stripLWhite(pbstring);
 		// make sure the next character is a semicolon...
 		if (pbstring[0] != ';') {
-			throw new PBParseException("Package Definition","Whitespace is not allowed in package names.");
+			throw new PBParseException("Package Definition","Whitespace is not allowed in package names.", pbstring.line);
 		}
 		// actually rip off the ;
 		pbstring = pbstring[1..$];
 		// make sure this is valid
-		if (!validateMultiIdentifier(Package)) throw new PBParseException("Package Identifier("~Package~")","Package identifier did not validate.");
+		if (!validateMultiIdentifier(Package)) throw new PBParseException("Package Identifier("~Package~")","Package identifier did not validate.", pbstring.line);
 		return Package;
 	}
 

@@ -102,7 +102,7 @@ struct PBChild {
 		return ret;
 	}
 
-	static PBChild opCall(ref string pbstring)
+	static PBChild opCall(ref ParserData pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
@@ -114,37 +114,37 @@ struct PBChild {
 		pbstring = stripLWhite(pbstring);
 		// now we want to pull out the type
 		child.type = stripValidChars(CClass.MultiIdentifier,pbstring);
-		if (!child.type.length) throw new PBParseException("Child Instantiation","Could not pull type from definition.");
-		if (!validateMultiIdentifier(child.type)) throw new PBParseException("Child Instantiation","Invalid type identifier "~child.type~".");
+		if (!child.type.length) throw new PBParseException("Child Instantiation","Could not pull type from definition.", pbstring.line);
+		if (!validateMultiIdentifier(child.type)) throw new PBParseException("Child Instantiation","Invalid type identifier "~child.type~".", pbstring.line);
 		pbstring = stripLWhite(pbstring);
 		// pull out the name of the instance, now
 		child.name = stripValidChars(CClass.Identifier,pbstring);
-		if (!child.name.length) throw new PBParseException("Child Instantiation("~child.type~")","Could not pull name from definition.");
-		if (!validIdentifier(child.name)) throw new PBParseException("Child Instantiation("~child.type~")","Invalid name identifier "~child.name~".");
+		if (!child.name.length) throw new PBParseException("Child Instantiation("~child.type~")","Could not pull name from definition.", pbstring.line);
+		if (!validIdentifier(child.name)) throw new PBParseException("Child Instantiation("~child.type~")","Invalid name identifier "~child.name~".", pbstring.line);
 		pbstring = stripLWhite(pbstring);
 		// make sure the next character is =, because we need to snag the index, next
-		if (pbstring[0] != '=') throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Missing '=' for child instantiation.");
+		if (pbstring[0] != '=') throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Missing '=' for child instantiation.", pbstring.line);
 		pbstring = pbstring[1..$];
 		pbstring = stripLWhite(pbstring);
 		// pull numeric index
 		string tmp = stripValidChars(CClass.Numeric,pbstring);
-		if (!tmp.length) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Could not pull numeric index.");
+		if (!tmp.length) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Could not pull numeric index.", pbstring.line);
 		child.index = to!int(tmp);
-		if (child.index <= 0) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Numeric index can not be less than 1.");
-		if (child.index > (1<<29)-1) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Numeric index can not be greater than (1<<29)-1.");
+		if (child.index <= 0) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Numeric index can not be less than 1.", pbstring.line);
+		if (child.index > (1<<29)-1) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Numeric index can not be greater than (1<<29)-1.", pbstring.line);
 		// deal with inline options
 		pbstring = stripLWhite(pbstring);
                 if (pbstring[0] == '[') {
 			PBOption[]opts = ripOptions(pbstring);
 			foreach (opt;opts) if (opt.name == "default") {
-				if (child.modifier == "repeated") throw new PBParseException("Default Option("~child.name~" default)","Default options can not be applied to repeated fields.");
+				if (child.modifier == "repeated") throw new PBParseException("Default Option("~child.name~" default)","Default options can not be applied to repeated fields.", pbstring.line);
 				child.valdefault = opt.value;
 			} else if (opt.name == "deprecated" && opt.value == "true") {
-				if (child.modifier == "required") throw new PBParseException("Deprecated Option("~child.name~" deprecated)","Deprecated options can not be applied to repeated fields.");
+				if (child.modifier == "required") throw new PBParseException("Deprecated Option("~child.name~" deprecated)","Deprecated options can not be applied to repeated fields.", pbstring.line);
 				child.is_dep = true;
 			} else if (opt.name == "packed" && opt.value == "true") {
-				if (child.modifier == "required" || child.modifier == "optional") throw new PBParseException("Packed Option("~child.name~" packed)","Packed options can not be applied to "~child.modifier~" fields.");
-				if (child.type == "string" || child.type == "bytes") throw new PBParseException("Packed Option("~child.name~" packed)","Packed options can not be applied to "~child.type~" types.");
+				if (child.modifier == "required" || child.modifier == "optional") throw new PBParseException("Packed Option("~child.name~" packed)","Packed options can not be applied to "~child.modifier~" fields.", pbstring.line);
+				if (child.type == "string" || child.type == "bytes") throw new PBParseException("Packed Option("~child.name~" packed)","Packed options can not be applied to "~child.type~" types.", pbstring.line);
 				// applying packed to message types is not properly checked, but is avoided in deser code
 				child.packed = true;
 			}
@@ -156,7 +156,7 @@ struct PBChild {
 			pbstring = pbstring[1..$];
 			return child;
 		}
-		throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","No idea what to do with string after index and options.");
+		throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","No idea what to do with string after index and options.", pbstring.line);
 	}
 
 	string genSerLine(string indent,bool is_exten = false) {
@@ -336,7 +336,7 @@ string toDType(string intype) {
 unittest {
 	writefln("unittest ProtocolBuffer.pbchild");
 	// assumes leading whitespace has already been stripped
-	string childtxt = "optional int32 i32test = 1[default=5];";
+	auto childtxt = ParserData("optional int32 i32test = 1[default=5];");
 	auto child = PBChild(childtxt);
 	debug writefln("Checking modifier...");
 	assert(child.modifier == "optional");
@@ -348,7 +348,7 @@ unittest {
 	assert(child.index == 1);
 	debug writefln("Checking output...");
 	debug writefln("%s",child.toDString("	"));
-	childtxt = 
+	childtxt =
 "	int _i32test = 5;
 	int i32test() {
 		return _i32test;

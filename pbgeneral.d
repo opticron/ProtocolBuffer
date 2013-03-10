@@ -7,6 +7,7 @@ import std.range;
 import std.stdio;
 import std.string;
 import std.uni;
+import std.conv;
 
 enum PBTypes {
 	PB_Package=1,
@@ -46,15 +47,23 @@ in {
 class PBParseException:Exception {
 	string locus;
 	string error;
-	this(string location,string problem, string file = __FILE__, size_t line = __LINE__) {
-		super(location~": "~problem, file, line);
+	size_t lineNumber;
+	this(string location,string problem, size_t inputLine, string file = __FILE__, size_t line = __LINE__) {
+		super(location~": "~problem~" Line:"~to!string(inputLine), file, line);
 		locus = location;
 		error = problem;
+		lineNumber = inputLine;
 	}
 }
 
+struct ParserData {
+	string input;
+	size_t line = 1;
+	alias input this;
+}
 
-PBTypes typeNextElement(in string pbstring)
+
+PBTypes typeNextElement(in ParserData pbstring)
 in {
 	assert(pbstring.length);
 } body {
@@ -85,11 +94,11 @@ in {
 	case "extend":
 		return PBTypes.PB_Extend;
 	case "service":
-		throw new PBParseException("Protocol Buffer Definition",capitalize(type)~" definitions are not currently supported.");
+		throw new PBParseException("Protocol Buffer Definition",capitalize(type)~" definitions are not currently supported.", pbstring.line);
 	default:
-		throw new PBParseException("Protocol Buffer Definition","Unknown element type "~type~".");
+		throw new PBParseException("Protocol Buffer Definition","Unknown element type "~type~".", pbstring.line);
 	}
-	throw new PBParseException("Protocol Buffer Definition","Element type "~type~" fell through the switch.");
+	throw new PBParseException("Protocol Buffer Definition","Element type "~type~" fell through the switch.", pbstring.line);
 }
 
 // this will rip off the next token
@@ -104,9 +113,16 @@ in {
 	return tmp;
 }
 
+unittest {
+	auto str = ParserData("// Filly\n");
+	assert(stripValidChars(CClass.Comment, str) == "// Filly");
+	assert(str == "\n");
+}
+
+
 // allowed characters vary by type
 bool isValidChar(CClass cc,char pc) {
-	switch(cc) {
+	final switch(cc) {
 	case CClass.MultiIdentifier:
 	case CClass.Identifier:
 		if (pc >= 'a' && pc <= 'z') return true;
@@ -121,10 +137,7 @@ bool isValidChar(CClass cc,char pc) {
 		if (pc == '\r') return false;
 		if (pc == '\f') return false;
 		return true;
-	default:
-		throw new PBParseException("Name Validation","Cannot validate characters for this PBType name.");
 	}
-	throw new PBParseException("Name Validation","PBType fell through the switch.");
 }
 
 bool validIdentifier(string ident)
@@ -135,7 +148,7 @@ in {
 	return true;
 }
 
-string  stripLWhite(string  s)
+ParserData stripLWhite(ParserData  s)
 in {
 	assert(s.length);
 } body {
@@ -145,14 +158,25 @@ in {
     {
         if (!isWhite(s[i]))
             break;
+		if (s[i] == '\n')
+			s.line++;
+		if (s[i] == '\r') {
+			s.line++;
+			if(s.length < i+1 && s[i+1] == '\n')
+				i++;
+		}
     }
-    return s[i .. s.length];
+    s.input = s.input[i .. $];
+	return s;
+}
+unittest {
+	assert("asdf " == stripLWhite(ParserData("  \n\tasdf ")));
+	assert(stripLWhite(ParserData("  \n\tasdf ")).line == 2);
+	assert("asdf" == stripLWhite(ParserData("  \tasdf")));
 }
 
 unittest {
 	writefln("unittest ProtocolBuffer.pbgeneral");
-	debug writefln("Checking stripLWhite...");
-	assert("asdf " == stripLWhite("  \n	asdf "));
 	debug writefln("Checking validIdentifier...");
 	assert(validIdentifier("asdf"));
 	assert(!validIdentifier("8asdf"));
@@ -164,7 +188,6 @@ unittest {
 	tmp = "as2f.ya7rr -adfbads25737";
 	assert(stripValidChars(CClass.MultiIdentifier,tmp) == "as2f.ya7rr");
 	assert(tmp == " -adfbads25737");
-	assert("asdf" == stripLWhite("  	asdf"));
 	debug writefln("");
 }
 
@@ -176,7 +199,7 @@ struct PBOption {
 }
 
 // TODO: actually do something with options
-PBOption ripOption(ref string pbstring,string terms = ";") {
+PBOption ripOption(ref ParserData pbstring,string terms = ";") {
 	// we need to pull apart the option and stuff it in a struct
 	PBOption pbopt;
 	if (pbstring[0] == '(') {
@@ -186,7 +209,7 @@ PBOption ripOption(ref string pbstring,string terms = ";") {
 	}
 	pbstring = stripLWhite(pbstring);
 	pbopt.name = stripValidChars(CClass.MultiIdentifier,pbstring);
-	if (!pbopt.name.length) throw new PBParseException("Option Parse","Malformed option: Option name not found.");
+	if (!pbopt.name.length) throw new PBParseException("Option Parse","Malformed option: Option name not found.", pbstring.line);
 	if (pbopt.extension) {
 		pbstring = stripLWhite(pbstring);
 		// rip off trailing )
@@ -201,26 +224,25 @@ PBOption ripOption(ref string pbstring,string terms = ";") {
 	}
 	pbstring = stripLWhite(pbstring);
 	// expect next char must be =
-	if (pbstring[0] != '=') throw new PBParseException("Option Parse("~pbopt.name~")","Malformed option: Missing = after option name.");
-	pbstring = pbstring[1..$];
+	if (!pbstring.input.skipOver("=")) throw new PBParseException("Option Parse("~pbopt.name~")","Malformed option: Missing = after option name.", pbstring.line);
 	pbstring = stripLWhite(pbstring);
 	// the remaining text between here and the terminator is our value
 	if (pbstring[0] == '"') {
 		pbopt.value = ripQuotedValue(pbstring);
 		pbstring = stripLWhite(pbstring);
-		if (terms.find(pbstring[0]).empty) throw new PBParseException("Option Parse("~pbopt.name~")","Malformed option: Bad terminator("~pbstring[0]~")");
+		if (terms.find(pbstring[0]).empty) throw new PBParseException("Option Parse("~pbopt.name~")","Malformed option: Bad terminator("~pbstring[0]~")", pbstring.line);
 		// leave the terminator in the string in case the caller wants to look at it
 		return pbopt;
 	}
 	// take care of non-quoted values
 	pbopt.value = stripValidChars(CClass.Identifier,pbstring);
 	pbstring = stripLWhite(pbstring);
-	if (terms.find(pbstring[0]).empty) throw new PBParseException("Option Parse("~pbopt.name~")","Malformed option: Bad terminator("~pbstring[0]~")");
+	if (terms.find(pbstring[0]).empty) throw new PBParseException("Option Parse("~pbopt.name~")","Malformed option: Bad terminator("~pbstring[0]~")", pbstring.line);
 	return pbopt;
 }
 
 unittest {
-	auto str = "java_package = \"Fish\";";
+	auto str = ParserData("java_package = \"Fish\";");
 	auto pbopt = ripOption(str);
 	assert(pbopt.name == "java_package");
 	assert(pbopt.value == "\"Fish\"");
@@ -241,9 +263,16 @@ unittest {
 	assert(pbopt.value == "LITE_RUNTIME");
 }
 
-string ripQuotedValue(ref string pbstring) {
+string ripQuotedValue(ref ParserData pbstring) {
 	int x;
 	for(x = 1;pbstring[x] != '"' && x < pbstring.length;x++) {
+		if(pbstring[x] == '\n')
+			pbstring.line++;
+		if(pbstring[x] == '\r') {
+			pbstring.line++;
+			if(pbstring.length < x+1 && pbstring[x+1] == '\n')
+				x++;
+		}
 	}
 	// inc to take the quotes with us
 	x++;
@@ -253,13 +282,13 @@ string ripQuotedValue(ref string pbstring) {
 }
 
 // this rips line-specific options from the string
-PBOption[]ripOptions(ref string pbstring) {
+PBOption[]ripOptions(ref ParserData pbstring) {
 	PBOption[]ret;
 	while(pbstring.length && pbstring[0] != ']') {
 		// this will rip off the leading [ and intermediary ','s
 		pbstring = pbstring[1..$];
 		ret ~= ripOption(pbstring,",]");
-		writefln("Pulled option %s with value %s",ret[$-1].name,ret[$-1].value);
+		debug writefln("Pulled option %s with value %s",ret[$-1].name,ret[$-1].value);
 	}
 	// rip off the trailing ]
 	pbstring = pbstring[1..$];
