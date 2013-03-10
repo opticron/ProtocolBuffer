@@ -71,7 +71,7 @@ struct PBMessage {
 		retstr ~= indent~"static "~name~" opCall(ref ubyte[]input) {\n";
 		retstr ~= indent~"	return Deserialize(input);\n";
 		retstr ~= indent~"}\n";
-		
+
 		// guaranteed to work, since we tack on a tab earlier
 		indent = indent[0..$-1];
 		retstr ~= indent~"}\n";
@@ -290,156 +290,17 @@ string genExtString(PBExtension[]extens,string indent) {
 }
 
 unittest {
-	string instring = "message glorm{\noptional int32 i32test = 1;\nmessage simple { }\noptional simple quack = 5;\n}\n";
-	string compstr = 
-"class glorm {
-	// deal with unknown fields
-	ubyte[]ufields;
-	static class simple {
-		// deal with unknown fields
-		ubyte[]ufields;
-		ubyte[]Serialize(int field = -1) {
-			ubyte[]ret;
-			ret ~= ufields;
-			// take care of header and length generation if necessary
-			if (field != -1) {
-				ret = genHeader(field,2)~toVarint(ret.length,field)[1..$]~ret;
-			}
-			return ret;
-		}
-		// if we're root, we can assume we own the whole string
-		// if not, the first thing we need to do is pull the length that belongs to us
-		static simple Deserialize(ref ubyte[]manip,bool isroot=true) {
-			auto retobj = new simple;
-			ubyte[]input = manip;
-			// cut apart the input string
-			if (!isroot) {
-				uint len = fromVarint!(uint)(manip);
-				input = manip[0..len];
-				manip = manip[len..$];
-			}
-			while(input.length) {
-				int header = fromVarint!(int)(input);
-				switch(getFieldNumber(header)) {
-				default:
-					// rip off unknown fields
-					retobj.ufields ~= _toVarint(header)~ripUField(input,getWireType(header));
-					break;
-				}
-			}
-			return retobj;
-		}
-		void MergeFrom(simple merger) {
-		}
-		static simple opCall(ref ubyte[]input) {
-			return Deserialize(input);
-		}
-	}
-	int _i32test;
-	int i32test() {
-		return _i32test;
-	}
-	void i32test(int input_var) {
-		_i32test = input_var;
-		_has_i32test = true;
-	}
-	bool _has_i32test = false;
-	bool has_i32test () {
-		return _has_i32test;
-	}
-	void clear_i32test () {
-		_has_i32test = false;
-	}
-	simple _quack;
-	simple quack() {
-		return _quack;
-	}
-	void quack(simple input_var) {
-		_quack = input_var;
-		_has_quack = true;
-	}
-	bool _has_quack = false;
-	bool has_quack () {
-		return _has_quack;
-	}
-	void clear_quack () {
-		_has_quack = false;
-	}
-	ubyte[]Serialize(int field = -1) {
-		ubyte[]ret;
-		ret ~= toVarint(i32test,1);
-		static if (is(simple:Object)) {
-			ret ~= quack.Serialize(5);
-		} else {
-			// this is an enum, almost certainly
-			ret ~= toVarint!(int)(quack,5);
-		}
-		ret ~= ufields;
-		// take care of header and length generation if necessary
-		if (field != -1) {
-			ret = genHeader(field,2)~toVarint(ret.length,field)[1..$]~ret;
-		}
-		return ret;
-	}
-	// if we're root, we can assume we own the whole string
-	// if not, the first thing we need to do is pull the length that belongs to us
-	static glorm Deserialize(ref ubyte[]manip,bool isroot=true) {
-		auto retobj = new glorm;
-		ubyte[]input = manip;
-		// cut apart the input string
-		if (!isroot) {
-			uint len = fromVarint!(uint)(manip);
-			input = manip[0..len];
-			manip = manip[len..$];
-		}
-		while(input.length) {
-			int header = fromVarint!(int)(input);
-			switch(getFieldNumber(header)) {
-			case 1:
-				if (getWireType(header) == 0) {
-					retobj._i32test = fromVarint!(int)(input);
-				} else {
-					throw new Exception(\"Invalid wiretype \"~std.conv.to!string(getWireType(header))~\" for variable type int32\");
-				}
-				retobj._has_i32test = true;
-				break;
-			case 5:
-				static if (is(simple:Object)) {
-					retobj._quack = simple.Deserialize(input,false);
-				} else {
-					// this is an enum, almost certainly
-					if (getWireType(header) == 0) {
-						retobj._quack = fromVarint!(int)(input);
-					} else {
-						throw new Exception(\"Invalid wiretype \"~std.conv.to!string(getWireType(header))~\" for variable type simple\");
-					}
-				}
-				retobj._has_quack = true;
-				break;
-			default:
-				// rip off unknown fields
-				retobj.ufields ~= _toVarint(header)~ripUField(input,getWireType(header));
-				break;
-			}
-		}
-		return retobj;
-	}
-	void MergeFrom(glorm merger) {
-		if (merger.has_i32test) i32test = merger.i32test;
-		if (merger.has_quack) quack = merger.quack;
-	}
-	static glorm opCall(ref ubyte[]input) {
-		return Deserialize(input);
-	}
-}
-";
+	enum instring = "message glorm{\noptional int32 i32test = 1;\nmessage simple { }\noptional simple quack = 5;\n}\n";
+
+    PBMessage PBCompileTime(string pbstring) {
+        return PBMessage(pbstring);
+    }
+
 	writefln("unittest ProtocolBuffer.pbmessage");
-	auto msg = PBMessage(instring);
-	debug {
-		writefln("Correct output:\n%s",compstr);
-		writefln("Generated output:\n%s",msg.toDString(""));
-	}
-	assert(msg.toDString("") == compstr);
+	enum msg = PBCompileTime(instring);
+    assert(msg.name == "glorm");
+    assert(msg.message_defs[0].name == "simple");
+    assert(msg.children.length == 2);
 	debug writefln("");
 }
 
