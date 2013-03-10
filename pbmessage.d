@@ -8,7 +8,9 @@ import ProtocolBuffer.pbenum;
 import ProtocolBuffer.pbchild;
 import ProtocolBuffer.pbextension;
 
+import std.algorithm;
 import std.conv;
+import std.range;
 import std.stdio;
 import std.string;
 
@@ -166,7 +168,7 @@ struct PBMessage {
 	} body {
 		// things we currently support in a message: messages, enums, and children(repeated, required, optional)
 		// first things first, rip off "message"
-		pbstring = pbstring["message".length..$];
+		pbstring.skipOver("message");
 		// now rip off the next set of whitespace
 		pbstring = stripLWhite(pbstring);
 		// get message name
@@ -180,7 +182,7 @@ struct PBMessage {
 			throw new PBParseException("Message Definition","Expected next character to be '{'. You may have a space in your message name: "~name);
 		}
 		// rip off opening {
-		pbstring = pbstring[1..$];
+		pbstring.popFront();
 		// prep for loop spinup by removing extraneous whitespace
 		pbstring = stripLWhite(pbstring);
 		// now we're ready to enter the loop and parse children
