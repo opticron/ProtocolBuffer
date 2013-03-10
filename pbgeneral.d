@@ -111,6 +111,7 @@ bool isValidChar(CClass cc,char pc) {
 	case CClass.Identifier:
 		if (pc >= 'a' && pc <= 'z') return true;
 		if (pc >= 'A' && pc <= 'Z') return true;
+		if (pc == '_') return true;
 		if (pc == '.' && cc == CClass.MultiIdentifier) return true;
 	case CClass.Numeric:
 		if (pc >= '0' && pc <= '9') return true;
@@ -174,7 +175,7 @@ struct PBOption {
 	bool extension = false;
 }
 
-// XXX actually do something with options
+// TODO: actually do something with options
 PBOption ripOption(ref string pbstring,string terms = ";") {
 	// we need to pull apart the option and stuff it in a struct
 	PBOption pbopt;
@@ -216,6 +217,28 @@ PBOption ripOption(ref string pbstring,string terms = ";") {
 	pbstring = stripLWhite(pbstring);
 	if (terms.find(pbstring[0]).empty) throw new PBParseException("Option Parse("~pbopt.name~")","Malformed option: Bad terminator("~pbstring[0]~")");
 	return pbopt;
+}
+
+unittest {
+	auto str = "java_package = \"Fish\";";
+	auto pbopt = ripOption(str);
+	assert(pbopt.name == "java_package");
+	assert(pbopt.value == "\"Fish\"");
+
+	str = "java_multiple_files = true;";
+	pbopt = ripOption(str);
+	assert(pbopt.name == "java_multiple_files");
+	assert(pbopt.value == "true");
+
+	str = "java_generate_equals_and_hash = true;";
+	pbopt = ripOption(str);
+	assert(pbopt.name == "java_generate_equals_and_hash");
+	assert(pbopt.value == "true");
+
+	str = "optimize_for = LITE_RUNTIME;";
+	pbopt = ripOption(str);
+	assert(pbopt.name == "optimize_for");
+	assert(pbopt.value == "LITE_RUNTIME");
 }
 
 string ripQuotedValue(ref string pbstring) {
