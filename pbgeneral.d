@@ -30,6 +30,7 @@ enum CClass {
 	Identifier,
 	Numeric,
 	Comment,
+	Value,
 }
 
 bool validateMultiIdentifier(string ident)
@@ -123,12 +124,14 @@ unittest {
 // allowed characters vary by type
 bool isValidChar(CClass cc,char pc) {
 	final switch(cc) {
+	case CClass.Value:
+		if (pc == '-') return true;
 	case CClass.MultiIdentifier:
+		if (pc == '.') return true;
 	case CClass.Identifier:
 		if (pc >= 'a' && pc <= 'z') return true;
 		if (pc >= 'A' && pc <= 'Z') return true;
 		if (pc == '_') return true;
-		if (pc == '.' && cc == CClass.MultiIdentifier) return true;
 	case CClass.Numeric:
 		if (pc >= '0' && pc <= '9') return true;
 		return false;
@@ -235,7 +238,7 @@ PBOption ripOption(ref ParserData pbstring,string terms = ";") {
 		return pbopt;
 	}
 	// take care of non-quoted values
-	pbopt.value = stripValidChars(CClass.Identifier,pbstring);
+	pbopt.value = stripValidChars(CClass.Value,pbstring);
 	pbstring = stripLWhite(pbstring);
 	if (terms.find(pbstring[0]).empty) throw new PBParseException("Option Parse("~pbopt.name~")","Malformed option: Bad terminator("~pbstring[0]~")", pbstring.line);
 	return pbopt;
@@ -261,6 +264,12 @@ unittest {
 	pbopt = ripOption(str);
 	assert(pbopt.name == "optimize_for");
 	assert(pbopt.value == "LITE_RUNTIME");
+
+    str = "default = -1];";
+	pbopt = ripOption(str, "]");
+    assert(pbopt.name == "default");
+    assert(pbopt.value == "-1");
+    assert(str.input.front == ']'); // option blocks may term with comma
 }
 
 string ripQuotedValue(ref ParserData pbstring) {
