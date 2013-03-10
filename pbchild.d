@@ -232,7 +232,7 @@ struct PBChild {
 		string ret;
 		string tname = "_"~name;
 		if (is_exten) tname = "__exten"~tname;
-		// check header byte with case since we're guaranteed to be in a switch
+		// check header ubyte with case since we're guaranteed to be in a switch
 		ret ~= indent~"case "~to!string(index)~":\n";
 		indent ~= "	";
 		// check the header vs the type
@@ -323,7 +323,7 @@ string toDType(string intype) {
                 retstr = "string ";
                 break;
         case "bytes":
-                retstr = "byte[]";
+                retstr = "ubyte[]";
                 break;
         default:
                 // this takes care of float, double, and bool as well
@@ -370,25 +370,25 @@ unittest {
 }
 
 bool isPackable(string type) {
-	byte wt = wTFromType(type);
+	ubyte wt = wTFromType(type);
 	if (wt == 0 || wt == 1 || wt == 5) {
 		return true;
 	}
 	return false;
 }
 
-byte wTFromType(string type) {
+ubyte wTFromType(string type) {
 	switch(type) {
 	case "float","sfixed32","fixed32":
-		return cast(byte)5;
+		return cast(ubyte)5;
 	case "double","sfixed64","fixed64":
-		return cast(byte)1;
+		return cast(ubyte)1;
 	case "bool","int32","int64","uint32","uint64","sint32","sint64":
-		return cast(byte)0;
+		return cast(ubyte)0;
 	case "string","bytes":
-		return cast(byte)2;
+		return cast(ubyte)2;
 	default:
-		return cast(byte)-1;
+		return cast(ubyte)-1;
 	}
-	return cast(byte)-1;
+	return cast(ubyte)-1;
 }

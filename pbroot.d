@@ -135,7 +135,7 @@ package myfirstpackage;
 "import ProtocolBuffer.pbhelper;
 class Person {
 	// deal with unknown fields
-	byte[]ufields;
+	ubyte[]ufields;
 	enum PhoneType {
 		MOBILE = 0,
 		HOME = 1,
@@ -143,7 +143,7 @@ class Person {
 	}
 	static class PhoneNumber {
 		// deal with unknown fields
-		byte[]ufields;
+		ubyte[]ufields;
 		string  _number;
 		string  number() {
 			return _number;
@@ -174,14 +174,14 @@ class Person {
 		void clear_type () {
 			_has_type = false;
 		}
-		byte[]Serialize(byte field = 16) {
-			byte[]ret;
-			ret ~= toByteString(number,cast(byte)1);
+		ubyte[]Serialize(ubyte field = 16) {
+			ubyte[]ret;
+			ret ~= toByteString(number,cast(ubyte)1);
 			static if (is(PhoneType:Object)) {
-				ret ~= type.Serialize(cast(byte)2);
+				ret ~= type.Serialize(cast(ubyte)2);
 			} else {
 				// this is an enum, almost certainly
-				ret ~= toVarint!(int)(type,cast(byte)2);
+				ret ~= toVarint!(int)(type,cast(ubyte)2);
 			}
 			ret ~= ufields;
 			// take care of header and length generation if necessary
@@ -192,9 +192,9 @@ class Person {
 		}
 		// if we're root, we can assume we own the whole string
 		// if not, the first thing we need to do is pull the length that belongs to us
-		static PhoneNumber Deserialize(ref byte[]manip,bool isroot=true) {
+		static PhoneNumber Deserialize(ref ubyte[]manip,bool isroot=true) {
 			auto retobj = new PhoneNumber;
-			byte[]input = manip;
+			ubyte[]input = manip;
 			// cut apart the input string
 			if (!isroot) {
 				uint len = fromVarint!(uint)(manip);
@@ -202,7 +202,7 @@ class Person {
 				manip = manip[len..$];
 			}
 			while(input.length) {
-				byte header = input[0];
+				ubyte header = input[0];
 				input = input[1..$];
 				switch(getFieldNumber(header)) {
 				case 1:
@@ -231,7 +231,7 @@ class Person {
 			if (merger.has_number) number = merger.number;
 			if (merger.has_type) type = merger.type;
 		}
-		static PhoneNumber opCall(ref byte[]input) {
+		static PhoneNumber opCall(ref ubyte[]input) {
 			return Deserialize(input);
 		}
 	}
@@ -302,17 +302,17 @@ class Person {
 	void add_phone (PhoneNumber[]__addme) {
 		_phone ~= __addme;
 	}
-	byte[]Serialize(byte field = 16) {
-		byte[]ret;
-		ret ~= toByteString(name,cast(byte)1);
-		ret ~= toVarint(id,cast(byte)2);
-		ret ~= toByteString(email,cast(byte)3);
+	ubyte[]Serialize(ubyte field = 16) {
+		ubyte[]ret;
+		ret ~= toByteString(name,cast(ubyte)1);
+		ret ~= toVarint(id,cast(ubyte)2);
+		ret ~= toByteString(email,cast(ubyte)3);
 		foreach(iter;phone) {
 			static if (is(PhoneNumber:Object)) {
-				ret ~= iter.Serialize(cast(byte)4);
+				ret ~= iter.Serialize(cast(ubyte)4);
 			} else {
 				// this is an enum, almost certainly
-				ret ~= toVarint!(int)(iter,cast(byte)4);
+				ret ~= toVarint!(int)(iter,cast(ubyte)4);
 			}
 		}
 		ret ~= ufields;
@@ -324,9 +324,9 @@ class Person {
 	}
 	// if we're root, we can assume we own the whole string
 	// if not, the first thing we need to do is pull the length that belongs to us
-	static Person Deserialize(ref byte[]manip,bool isroot=true) {
+	static Person Deserialize(ref ubyte[]manip,bool isroot=true) {
 		auto retobj = new Person;
-		byte[]input = manip;
+		ubyte[]input = manip;
 		// cut apart the input string
 		if (!isroot) {
 			uint len = fromVarint!(uint)(manip);
@@ -334,7 +334,7 @@ class Person {
 			manip = manip[len..$];
 		}
 		while(input.length) {
-			byte header = input[0];
+			ubyte header = input[0];
 			input = input[1..$];
 			switch(getFieldNumber(header)) {
 			case 1:
@@ -377,7 +377,7 @@ class Person {
 		if (merger.has_email) email = merger.email;
 		if (merger.has_phone) add_phone(merger.phone);
 	}
-	static Person opCall(ref byte[]input) {
+	static Person opCall(ref ubyte[]input) {
 		return Deserialize(input);
 	}
 }

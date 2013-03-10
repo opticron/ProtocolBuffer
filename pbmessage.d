@@ -40,7 +40,7 @@ struct PBMessage {
 		retstr ~= indent~(indent.length?"static ":"")~"class "~name~" {\n";
 		indent = indent~"	";
 		retstr ~= indent~"// deal with unknown fields\n";
-		retstr ~= indent~"byte[]ufields;\n";
+		retstr ~= indent~"ubyte[]ufields;\n";
 		// fill the class with goodies!
 		// first, we'll do the enums!
 		foreach(pbenum;enum_defs) {
@@ -66,7 +66,7 @@ struct PBMessage {
 		// deal with what little we need to do for extensions
 		retstr ~= extensions.genExtString(indent~"static ");
 		// include a static opcall to do deserialization to make coding simpler
-		retstr ~= indent~"static "~name~" opCall(ref byte[]input) {\n";
+		retstr ~= indent~"static "~name~" opCall(ref ubyte[]input) {\n";
 		retstr ~= indent~"	return Deserialize(input);\n";
 		retstr ~= indent~"}\n";
 		
@@ -79,10 +79,10 @@ struct PBMessage {
 	string genSerCode(string indent) {
 		string ret = "";
 		// use -1 as a default value, since a nibble can not produce that number
-		ret ~= indent~"byte[]Serialize(int field = -1) {\n";
+		ret ~= indent~"ubyte[]Serialize(int field = -1) {\n";
 		indent = indent~"	";
 		// codegen is fun!
-		ret ~= indent~"byte[]ret;\n";
+		ret ~= indent~"ubyte[]ret;\n";
 		// serialization code goes here
 		foreach(pbchild;children) {
 			ret ~= pbchild.genSerLine(indent);
@@ -111,11 +111,11 @@ struct PBMessage {
 		// add comments
 		ret ~= indent~"// if we're root, we can assume we own the whole string\n";
 		ret ~= indent~"// if not, the first thing we need to do is pull the length that belongs to us\n";
-		ret ~= indent~"static "~name~" Deserialize(ref byte[]manip,bool isroot=true) {return new "~name~"(manip,isroot);}\n";
+		ret ~= indent~"static "~name~" Deserialize(ref ubyte[]manip,bool isroot=true) {return new "~name~"(manip,isroot);}\n";
 		ret ~= indent~"this(){}\n";
-		ret ~= indent~"this(ref byte[]manip,bool isroot=true) {\n";
+		ret ~= indent~"this(ref ubyte[]manip,bool isroot=true) {\n";
 		indent = indent~"	";
-		ret ~= indent~"byte[]input = manip;\n";
+		ret ~= indent~"ubyte[]input = manip;\n";
 
 		ret ~= indent~"// cut apart the input string\n";
 		ret ~= indent~"if (!isroot) {\n";
@@ -292,12 +292,12 @@ unittest {
 	string compstr = 
 "class glorm {
 	// deal with unknown fields
-	byte[]ufields;
+	ubyte[]ufields;
 	static class simple {
 		// deal with unknown fields
-		byte[]ufields;
-		byte[]Serialize(int field = -1) {
-			byte[]ret;
+		ubyte[]ufields;
+		ubyte[]Serialize(int field = -1) {
+			ubyte[]ret;
 			ret ~= ufields;
 			// take care of header and length generation if necessary
 			if (field != -1) {
@@ -307,9 +307,9 @@ unittest {
 		}
 		// if we're root, we can assume we own the whole string
 		// if not, the first thing we need to do is pull the length that belongs to us
-		static simple Deserialize(ref byte[]manip,bool isroot=true) {
+		static simple Deserialize(ref ubyte[]manip,bool isroot=true) {
 			auto retobj = new simple;
-			byte[]input = manip;
+			ubyte[]input = manip;
 			// cut apart the input string
 			if (!isroot) {
 				uint len = fromVarint!(uint)(manip);
@@ -329,7 +329,7 @@ unittest {
 		}
 		void MergeFrom(simple merger) {
 		}
-		static simple opCall(ref byte[]input) {
+		static simple opCall(ref ubyte[]input) {
 			return Deserialize(input);
 		}
 	}
@@ -363,8 +363,8 @@ unittest {
 	void clear_quack () {
 		_has_quack = false;
 	}
-	byte[]Serialize(int field = -1) {
-		byte[]ret;
+	ubyte[]Serialize(int field = -1) {
+		ubyte[]ret;
 		ret ~= toVarint(i32test,1);
 		static if (is(simple:Object)) {
 			ret ~= quack.Serialize(5);
@@ -381,9 +381,9 @@ unittest {
 	}
 	// if we're root, we can assume we own the whole string
 	// if not, the first thing we need to do is pull the length that belongs to us
-	static glorm Deserialize(ref byte[]manip,bool isroot=true) {
+	static glorm Deserialize(ref ubyte[]manip,bool isroot=true) {
 		auto retobj = new glorm;
-		byte[]input = manip;
+		ubyte[]input = manip;
 		// cut apart the input string
 		if (!isroot) {
 			uint len = fromVarint!(uint)(manip);
@@ -426,7 +426,7 @@ unittest {
 		if (merger.has_i32test) i32test = merger.i32test;
 		if (merger.has_quack) quack = merger.quack;
 	}
-	static glorm opCall(ref byte[]input) {
+	static glorm opCall(ref ubyte[]input) {
 		return Deserialize(input);
 	}
 }
