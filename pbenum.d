@@ -3,7 +3,10 @@
 // code to read and write the specified format
 module ProtocolBuffer.pbenum;
 import ProtocolBuffer.pbgeneral;
+
+import std.algorithm;
 import std.conv;
+import std.range;
 import std.stdio;
 import std.string;
 version(unittest) import std.regex;
@@ -35,22 +38,35 @@ struct PBEnum {
 		if (!pbenum.name.length) throw new PBParseException("Enum Definition","Could not pull name from definition.", pbstring.line);
 		if (!validIdentifier(pbenum.name)) throw new PBParseException("Enum Definition","Invalid name identifier "~pbenum.name~".", pbstring.line);
 		pbstring = stripLWhite(pbstring);
+
+		// rip out the comment...
+		if (pbstring.length>1 && pbstring[0..2] == "//") {
+			stripValidChars(CClass.Comment,pbstring);
+			pbstring = stripLWhite(pbstring);
+		}
+
 		// make sure the next character is the opening {
-		if (pbstring[0] != '{') {
+		if (!pbstring.input.skipOver("{")) {
 			throw new PBParseException("Enum Definition("~pbenum.name~")","Expected next character to be '{'. You may have a space in your enum name: "~pbenum.name, pbstring.line);
 		}
-		// rip off opening {
-		pbstring = pbstring[1..$];
+
+		pbstring = stripLWhite(pbstring);
 		// now we're ready to enter the loop and parse children
 		while(pbstring[0] != '}') {
-			pbstring = stripLWhite(pbstring);
-			if (pbstring.length>1 && pbstring[0..2] == "//") {
+			if (pbstring.input.skipOver("option")) {
+				pbstring = stripLWhite(pbstring);
+				writeln("Ignoring option ",
+				ripOption(pbstring).name);
+				pbstring.input.skipOver(";");
+			}
+			else if (pbstring.length>1 && pbstring[0..2] == "//") {
 				// rip out the comment...
 				stripValidChars(CClass.Comment,pbstring);
 			} else {
 				// start parsing, we shouldn't have any whitespace here
 				pbenum.grabEnumValue(pbstring);
 			}
+			pbstring = stripLWhite(pbstring);
 		}
 		// rip off the }
 		pbstring = pbstring[1..$];
@@ -66,12 +82,6 @@ struct PBEnum {
 		string tmp = stripValidChars(CClass.Identifier,pbstring);
 		if (!tmp.length) throw new PBParseException("Enum Definition("~name~")","Could not pull item name from definition.", pbstring.line);
 		if (!validIdentifier(tmp)) throw new PBParseException("Enum Definition("~name~")","Invalid item name identifier "~tmp~".", pbstring.line);
-		// check for options
-		if (tmp == "option") {
-			writefln("Ignoring option");
-			ripOption(pbstring);
-			return;
-		}
 		pbstring = stripLWhite(pbstring);
 		// ensure that the name doesn't already exist
 		foreach(val;values.values) if (tmp == val) throw new PBParseException("Enum Definition("~name~")","Multiple defined element("~tmp~")", pbstring.line);
@@ -90,12 +100,8 @@ struct PBEnum {
 			ripOptions(pbstring);
 		}
 		// make sure we snatch a semicolon
-		if (pbstring[0] == ';') {
-			// we're done here
-			pbstring = pbstring[1..$];
-			return;
-		}
-		throw new PBParseException("Enum Definition("~name~"."~tmp~"="~num~")","Expected ';'.", pbstring.line);
+		if (!pbstring.input.skipOver(";"))
+			throw new PBParseException("Enum Definition("~name~"."~tmp~"="~num~")","Expected ';'.", pbstring.line);
 	}
 }
 
@@ -104,10 +110,20 @@ unittest {
 	// the leading whitespace is assumed to already have been stripped
 	auto estring = ParserData("enum potato {TOTALS = 1;JUNK= 5 ; ALL =3;}");
 	auto edstring = PBEnum(estring).toDString("");
-	debug writefln("%s",edstring);
     assert(edstring.match(regex(r"TOTALS = 1")).empty == false);
     assert(edstring.match(regex(r"ALL = 3")).empty == false);
     assert(edstring.match(regex(r"JUNK = 5")).empty == false);
-	debug writefln("");
+
+	estring = "enum potato // With comment
+    {
+        option allow_alias = true;
+	TOTALS = 1;
+	JUNK= 5 ;
+	ALL =3;
+}";
+	edstring = PBEnum(estring).toDString("");
+    assert(edstring.match(regex(r"TOTALS = 1")).empty == false);
+    assert(edstring.match(regex(r"ALL = 3")).empty == false);
+    assert(edstring.match(regex(r"JUNK = 5")).empty == false);
 }
 
