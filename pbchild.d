@@ -109,8 +109,8 @@ struct PBChild {
 		PBChild child;
 		// all of the modifiers happen to be the same length...whodathunkit
 		// also, it's guaranteed to be there by previous code, so it shouldn't need error checking
-		child.modifier = pbstring[0.."repeated".length];
-		pbstring = pbstring["repeated".length..$];
+		child.modifier = pbstring[0..8];
+		pbstring = pbstring[8..$];
 		pbstring = stripLWhite(pbstring);
 		// now we want to pull out the type
 		child.type = stripValidChars(CClass.MultiIdentifier,pbstring);
@@ -134,7 +134,7 @@ struct PBChild {
 		if (child.index > (1<<29)-1) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Numeric index can not be greater than (1<<29)-1.", pbstring.line);
 		// deal with inline options
 		pbstring = stripLWhite(pbstring);
-                if (pbstring[0] == '[') {
+		if (pbstring[0] == '[') {
 			PBOption[]opts = ripOptions(pbstring);
 			foreach (opt;opts) if (opt.name == "default") {
 				if (child.modifier == "repeated") throw new PBParseException("Default Option("~child.name~" default)","Default options can not be applied to repeated fields.", pbstring.line);

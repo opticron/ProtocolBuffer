@@ -291,6 +291,6 @@ PBOption[]ripOptions(ref ParserData pbstring) {
 		debug writefln("Pulled option %s with value %s",ret[$-1].name,ret[$-1].value);
 	}
 	// rip off the trailing ]
-	pbstring = pbstring[1..$];
+	pbstring.input.skipOver("]");
 	return ret;
 }

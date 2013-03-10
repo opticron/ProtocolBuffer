@@ -74,10 +74,11 @@ struct PBEnum {
 		}
 		pbstring = stripLWhite(pbstring);
 		// ensure that the name doesn't already exist
-		foreach(val;values.values) if (tmp == val) throw new PBParseException("Enum Definition("~name~")","Multiply defined element("~tmp~")", pbstring.line);
+		foreach(val;values.values) if (tmp == val) throw new PBParseException("Enum Definition("~name~")","Multiple defined element("~tmp~")", pbstring.line);
 		// make sure to traverse the '='
 		if (pbstring[0] != '=') throw new PBParseException("Enum Definition("~name~"."~tmp~")","Expected '=', but got something else. You may have a space in one of your enum items.", pbstring.line);
 		pbstring = pbstring[1..$];
+
 		pbstring = stripLWhite(pbstring);
 		// now parse a numeric
 		string num = stripValidChars(CClass.Numeric,pbstring);
