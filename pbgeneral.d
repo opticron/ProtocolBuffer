@@ -63,6 +63,13 @@ struct ParserData {
 	alias input this;
 }
 
+struct CommentManager {
+	string[] comments;
+	size_t line;
+	size_t lastElementLine;
+	PBTypes lastElementType;
+	alias comments this;
+}
 
 PBTypes typeNextElement(in ParserData pbstring)
 in {

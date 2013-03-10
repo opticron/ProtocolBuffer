@@ -17,6 +17,7 @@ struct PBRoot {
 	PBEnum[]enum_defs;
 	string []imports;
 	string Package;
+	string[] comments;
 	PBExtension[]extensions;
 	string toDString(string indent="") {
 		string retstr = "";
@@ -42,9 +43,13 @@ struct PBRoot {
         auto pbstring = ParserData(input);
 		// rip off whitespace before looking for the next definition
 		pbstring = stripLWhite(pbstring);
+		CommentManager storeComment;
+
 		// loop until the string is gone
-		while(pbstring.length) {
-			switch(typeNextElement(pbstring)){
+		while(!pbstring.input.empty) {
+			storeComment.lastElementType = typeNextElement(pbstring);
+			storeComment.lastElementLine = pbstring.line;
+			switch(storeComment.lastElementType){
 			case PBTypes.PB_Package:
 				root.Package = parsePackage(pbstring);
 				break;
@@ -58,7 +63,12 @@ struct PBRoot {
 				root.enum_defs ~= PBEnum(pbstring);
 				break;
 			case PBTypes.PB_Comment:
-				stripValidChars(CClass.Comment,pbstring);
+				// Preserve at least one spacing in comments
+				if(storeComment.line+1 < pbstring.line)
+					if(!storeComment.comments.empty)
+						storeComment ~= "";
+				storeComment ~= stripValidChars(CClass.Comment,pbstring);
+				storeComment.line = pbstring.line;
 				break;
 			case PBTypes.PB_Option:
 				// rip of "option" and leading whitespace
@@ -85,6 +95,28 @@ struct PBRoot {
 			// rip off whitespace before looking for the next definition
 			// this needs to stay at the end
 			pbstring = stripLWhite(pbstring);
+
+			// Attach Comments to elements
+			if(!storeComment.comments.empty) {
+				if(storeComment.line == storeComment.lastElementLine
+				   || storeComment.line+3 > storeComment.lastElementLine) {
+					switch(storeComment.lastElementType) {
+						case PBTypes.PB_Comment:
+							break;
+						case PBTypes.PB_Message:
+							root.message_defs.back.comments = storeComment;
+							goto default;
+						case PBTypes.PB_Enum:
+							root.enum_defs.back.comments = storeComment;
+							goto default;
+						case PBTypes.PB_Package:
+							root.comments = storeComment;
+							goto default;
+						default:
+							storeComment.comments = null;
+					}
+				}
+			}
 		}
 		return root;
 	}
@@ -143,10 +175,7 @@ package myfirstpackage;
 	auto root = PBRoot(pbstr);
     assert(root.Package == "myfirstpackage");
     assert(root.message_defs[0].name == "Person");
+    assert(root.message_defs[0].comments.length == 1);
     assert(root.message_defs[0].message_defs[0].name == "PhoneNumber");
     assert(root.message_defs[0].enum_defs[0].name == "PhoneType");
-}
-
-version(unittests) {
-int main() {return 0;}
 }

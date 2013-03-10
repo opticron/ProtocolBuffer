@@ -13,12 +13,22 @@ version(unittest) import std.regex;
 
 struct PBEnum {
 	string name;
+	string[] comments;
+	string[][int] valueComments;
 	string[int] values;
 	string toDString(string indent) {
 		string retstr = "";
+		foreach(c; comments) {
+			retstr ~= indent ~ (c.empty ? "":"/") ~ c ~ "\n";
+		}
 		retstr ~= indent~"enum "~name~" {\n";
 		foreach (key,value;values) {
-			retstr ~= indent~"	"~value~" = "~to!string(key)~",\n";
+			if(key in valueComments)
+				foreach(c; valueComments[key])
+					retstr ~= indent ~ "/" ~ c ~ "\n";
+
+			retstr ~= indent~"\t"~value~" = "~to!string(key)~",\n";
+
 		}
 		retstr ~= indent~"}\n";
 		return retstr;
@@ -41,7 +51,7 @@ struct PBEnum {
 
 		// rip out the comment...
 		if (pbstring.length>1 && pbstring[0..2] == "//") {
-			stripValidChars(CClass.Comment,pbstring);
+			pbenum.comments ~= stripValidChars(CClass.Comment,pbstring);
 			pbstring = stripLWhite(pbstring);
 		}
 
@@ -49,6 +59,9 @@ struct PBEnum {
 		if (!pbstring.input.skipOver("{")) {
 			throw new PBParseException("Enum Definition("~pbenum.name~")","Expected next character to be '{'. You may have a space in your enum name: "~pbenum.name, pbstring.line);
 		}
+
+		CommentManager storeComment;
+		int elementNum;
 
 		pbstring = stripLWhite(pbstring);
 		// now we're ready to enter the loop and parse children
@@ -61,10 +74,20 @@ struct PBEnum {
 			}
 			else if (pbstring.length>1 && pbstring[0..2] == "//") {
 				// rip out the comment...
-				stripValidChars(CClass.Comment,pbstring);
+				storeComment ~= stripValidChars(CClass.Comment,pbstring);
+				storeComment.line = pbstring.line;
 			} else {
 				// start parsing, we shouldn't have any whitespace here
-				pbenum.grabEnumValue(pbstring);
+				elementNum = pbenum.grabEnumValue(pbstring);
+				storeComment.lastElementLine = pbstring.line;
+				if(!storeComment.comments.empty) {
+					pbenum.valueComments[elementNum] = storeComment;
+					storeComment.comments = null;
+				}
+			}
+			if(storeComment.line == storeComment.lastElementLine) {
+				pbenum.valueComments[elementNum] = storeComment;
+				storeComment.comments = null;
 			}
 			pbstring = stripLWhite(pbstring);
 		}
@@ -73,7 +96,11 @@ struct PBEnum {
 		return pbenum;
 	}
 
-	void grabEnumValue(ref ParserData pbstring)
+	/**
+	 * returns:
+	 *     enum entry value
+	 */
+	int grabEnumValue(ref ParserData pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
@@ -86,8 +113,7 @@ struct PBEnum {
 		// ensure that the name doesn't already exist
 		foreach(val;values.values) if (tmp == val) throw new PBParseException("Enum Definition("~name~")","Multiple defined element("~tmp~")", pbstring.line);
 		// make sure to traverse the '='
-		if (pbstring[0] != '=') throw new PBParseException("Enum Definition("~name~"."~tmp~")","Expected '=', but got something else. You may have a space in one of your enum items.", pbstring.line);
-		pbstring = pbstring[1..$];
+		if (!pbstring.input.skipOver("=")) throw new PBParseException("Enum Definition("~name~"."~tmp~")","Expected '=', but got something else. You may have a space in one of your enum items.", pbstring.line);
 
 		pbstring = stripLWhite(pbstring);
 		// now parse a numeric
@@ -102,6 +128,8 @@ struct PBEnum {
 		// make sure we snatch a semicolon
 		if (!pbstring.input.skipOver(";"))
 			throw new PBParseException("Enum Definition("~name~"."~tmp~"="~num~")","Expected ';'.", pbstring.line);
+
+		return to!int(num);
 	}
 }
 
@@ -117,13 +145,16 @@ unittest {
 	estring = "enum potato // With comment
     {
         option allow_alias = true;
-	TOTALS = 1;
+	TOTALS = 1; // This is total
+	// Just junk
+	// is all
 	JUNK= 5 ;
 	ALL =3;
 }";
-	edstring = PBEnum(estring).toDString("");
-    assert(edstring.match(regex(r"TOTALS = 1")).empty == false);
-    assert(edstring.match(regex(r"ALL = 3")).empty == false);
-    assert(edstring.match(regex(r"JUNK = 5")).empty == false);
+	auto enumValue = PBEnum(estring);
+	assert(enumValue.comments[0] == "// With comment");
+	assert(enumValue.valueComments[1][0] == "// This is total");
+	assert(enumValue.valueComments[5][0] == "// Just junk");
+	assert(enumValue.valueComments[5][1] == "// is all");
 }
 

@@ -19,6 +19,7 @@ import std.string;
 
 struct PBMessage {
 	string name;
+	string[] comments;
 	// message definitions that actually occur within this message
 	PBMessage[]message_defs;
 	// enum definitions that actually occur within this message
@@ -39,6 +40,8 @@ struct PBMessage {
 	// XXX need to support services at some point 
 	string toDString(string indent) {
 		string retstr = "";
+		foreach(c; comments)
+			retstr ~= indent ~ (c.empty ? "":"/") ~ c ~ "\n";
 		retstr ~= indent~(indent.length?"static ":"")~"class "~name~" {\n";
 		indent = indent~"	";
 		retstr ~= indent~"// deal with unknown fields\n";
@@ -178,18 +181,20 @@ struct PBMessage {
 		// rip off whitespace
 		pbstring = stripLWhite(pbstring);
 		// make sure the next character is the opening {
-		if (pbstring[0] != '{') {
+		if(!pbstring.input.skipOver("{")) {
 			throw new PBParseException("Message Definition","Expected next character to be '{'. You may have a space in your message name: "~name, pbstring.line);
 		}
-		// rip off opening {
-		pbstring.input.popFront();
+
 		// prep for loop spinup by removing extraneous whitespace
 		pbstring = stripLWhite(pbstring);
+		CommentManager storeComment;
+
 		// now we're ready to enter the loop and parse children
 		while(pbstring[0] != '}') {
 			// start parsing, we shouldn't have any whitespace here
-			PBTypes type = typeNextElement(pbstring);
-			switch(type){
+			storeComment.lastElementType = typeNextElement(pbstring);
+			storeComment.lastElementLine = pbstring.line;
+			switch(storeComment.lastElementType){
 			case PBTypes.PB_Message:
 				message.message_defs ~= PBMessage(pbstring);
 				break;
@@ -208,7 +213,12 @@ struct PBMessage {
 				message.children ~= PBChild(pbstring);
 				break;
 			case PBTypes.PB_Comment:
-				stripValidChars(CClass.Comment,pbstring);
+				// Preserve at least one spacing in comments
+				if(storeComment.line+1 < pbstring.line)
+					if(!storeComment.comments.empty)
+						storeComment ~= "";
+				storeComment ~= stripValidChars(CClass.Comment,pbstring);
+				storeComment.line = pbstring.line;
 				break;
 			case PBTypes.PB_Option:
 				// rip of "option" and leading whitespace
@@ -219,11 +229,36 @@ struct PBMessage {
 			default:
 				throw new PBParseException("Message Definition","Only extend, service, package, and message are allowed here.", pbstring.line);
 			}
+			pbstring.input.skipOver(";");
 			// this needs to stay at the end
 			pbstring = stripLWhite(pbstring);
+
+			// Attach Comments to elements
+			if(!storeComment.comments.empty) {
+				if(storeComment.line == storeComment.lastElementLine
+				   || storeComment.line+3 > storeComment.lastElementLine) {
+					switch(storeComment.lastElementType) {
+						case PBTypes.PB_Comment:
+							break;
+						case PBTypes.PB_Message:
+							message.message_defs.back.comments = storeComment;
+							goto default;
+						case PBTypes.PB_Enum:
+							message.enum_defs.back.comments = storeComment;
+							goto default;
+						case PBTypes.PB_Repeated:
+						case PBTypes.PB_Required:
+						case PBTypes.PB_Optional:
+							message.children.back.comments = storeComment;
+							goto default;
+						default:
+							storeComment.comments = null;
+					}
+				}
+			}
 		}
 		// rip off the }
-		pbstring = pbstring[1..$];
+		pbstring.input.skipOver("}");
 		return message;
 	}
 
@@ -302,6 +337,19 @@ unittest {
     assert(msg.name == "glorm");
     assert(msg.message_defs[0].name == "simple");
     assert(msg.children.length == 2);
-	debug writefln("");
+
+	auto str = ParserData("message Person {
+		// I comment types
+		message PhoneNumber {
+		required string number = 1;
+		// Their type of phone
+		optional PhoneType type = 2 ;
+	}}");
+
+	auto ms = PBMessage(str);
+    assert(ms.name == "Person");
+    assert(ms.message_defs[0].name == "PhoneNumber");
+    assert(ms.message_defs[0].comments[0] == "// I comment types");
+    assert(ms.message_defs[0].children[1].comments[0] == "// Their type of phone");
 }
 

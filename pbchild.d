@@ -3,6 +3,8 @@
 // code to read and write the specified format
 module ProtocolBuffer.pbchild;
 import ProtocolBuffer.pbgeneral;
+
+import std.range;
 import std.string;
 import std.stdio;
 import std.conv;
@@ -11,6 +13,7 @@ struct PBChild {
 	string modifier;
 	string type;
 	string name;
+	string[] comments;
 	int index;
 	string valdefault;
 	bool packed = false;
@@ -19,13 +22,24 @@ struct PBChild {
 	string toDString(string indent) {
 		string ret;
 		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]_":" _")~name~(valdefault.length?" = "~valdefault:"")~";\n";
+
+		foreach(c; comments)
+			ret ~= indent ~ (c.empty ? "":"/") ~ c ~ "\n";
+		if(comments.empty)
+			ret ~= indent ~ "///\n";
 		// get accessor
 		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~name~"() {\n";
 		ret ~= indent~"	return _"~name~";\n";
 		ret ~= indent~"}\n";
+
+		if(!comments.empty)
+			ret ~= indent ~ "/// ditto\n";
+		else
+			ret ~= indent ~ "///\n";
 		// set accessor
 		ret ~= indent~(is_dep?"deprecated ":"")~"void "~name~"("~toDType(type)~(modifier=="repeated"?"[]":" ")~"input_var) {\n";
 		ret ~= indent~"	_"~name~" = input_var;\n";
+
 		if (modifier != "repeated") ret ~= indent~"	_has_"~name~" = true;\n";
 		ret ~= indent~"}\n";
 		if (modifier == "repeated") {
@@ -350,9 +364,11 @@ unittest {
 	debug writefln("%s",child.toDString("	"));
 	childtxt =
 "	int _i32test = 5;
+	///
 	int i32test() {
 		return _i32test;
 	}
+	///
 	void i32test(int input_var) {
 		_i32test = input_var;
 		_has_i32test = true;
@@ -365,7 +381,7 @@ unittest {
 		_has_i32test = false;
 	}
 ";
-	assert(child.toDString("	") == childtxt);
+	assert(child.toDString("\t") == childtxt);
 	debug writefln("");
 }
 
