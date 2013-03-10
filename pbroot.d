@@ -81,6 +81,7 @@ struct PBRoot {
 			default:
 				throw new PBParseException("Root Definition("~root.Package~")","Either there's a definition here that isn't supported, or the definition isn't allowed here", pbstring.line);
 			}
+			pbstring.input.skipOver(";");
 			// rip off whitespace before looking for the next definition
 			// this needs to stay at the end
 			pbstring = stripLWhite(pbstring);
@@ -115,6 +116,7 @@ struct PBRoot {
 
 unittest {
 	string pbstr = "
+option optimize_for = SPEED;
 package myfirstpackage;
 // my comments hopefully won't explode anything
 	message Person {required string name= 1;
