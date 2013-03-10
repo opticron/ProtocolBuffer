@@ -46,10 +46,10 @@ in {
 class PBParseException:Exception {
 	string locus;
 	string error;
-	this(string location,string problem) {
+	this(string location,string problem, string file = __FILE__, size_t line = __LINE__) {
+		super(location~": "~problem, file, line);
 		locus = location;
 		error = problem;
-		super(locus~": "~error);
 	}
 }
 
