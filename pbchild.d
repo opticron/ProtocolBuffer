@@ -336,7 +336,7 @@ string toDType(string intype) {
                 retstr = "ulong";
                 break;
         case "string":
-                retstr = "string ";
+                retstr = "string";
                 break;
         case "bytes":
                 retstr = "ubyte[]";
