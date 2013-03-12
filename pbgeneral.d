@@ -110,10 +110,12 @@ in {
 }
 
 // this will rip off the next token
-string stripValidChars(CClass cc,ref string pbstring)
+string stripValidChars(CClass cc,ref ParserData pbstring)
 in {
 	assert(pbstring.length);
 } body {
+	if(pbstring[0] == '_' || pbstring[$-1] == '_')
+		throw new PBParseException("Next Token","Identifier cannot begin or end with underscore", pbstring.line);
 	int i=0;
 	for(;i<pbstring.length && isValidChar(cc,pbstring[i]);i++){}
 	string tmp = pbstring[0..i];
@@ -192,10 +194,10 @@ unittest {
 	assert(!validIdentifier("8asdf"));
 	// also takes care of isValidChar
 	debug writefln("Checking stripValidChars...");
-	string tmp = "asdf1 yarrr";
+	auto tmp = ParserData("asdf1 yarrr");
 	assert(stripValidChars(CClass.Identifier,tmp) == "asdf1");
 	assert(tmp == " yarrr");
-	tmp = "as2f.ya7rr -adfbads25737";
+	tmp = ParserData("as2f.ya7rr -adfbads25737");
 	assert(stripValidChars(CClass.MultiIdentifier,tmp) == "as2f.ya7rr");
 	assert(tmp == " -adfbads25737");
 	debug writefln("");
