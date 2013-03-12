@@ -2,18 +2,24 @@
 // required to parse a protocol buffer file or tree and generate
 // code to read and write the specified format
 module ProtocolBuffer.pbmessage;
+
 import ProtocolBuffer.pbgeneral;
 import ProtocolBuffer.pbenum;
 import ProtocolBuffer.pbchild;
 import ProtocolBuffer.pbextension;
-import std.string;
+
+import std.algorithm;
+import std.conv;
+import std.range;
 import std.stdio;
+import std.string;
 
 // I intentionally left out all identifier validation routines, because the compiler knows how to resolve symbols. 
 // This means I don't have to write that code. 
 
 struct PBMessage {
-	char[]name;
+	string name;
+	string[] comments;
 	// message definitions that actually occur within this message
 	PBMessage[]message_defs;
 	// enum definitions that actually occur within this message
@@ -32,12 +38,14 @@ struct PBMessage {
 	allow_exten[]exten_sets;
 	// XXX need to support options correctly 
 	// XXX need to support services at some point 
-	char[]toDString(char[]indent) {
-		char[]retstr = "";
+	string toDString(string indent) {
+		string retstr = "";
+		foreach(c; comments)
+			retstr ~= indent ~ (c.empty ? "":"/") ~ c ~ "\n";
 		retstr ~= indent~(indent.length?"static ":"")~"class "~name~" {\n";
 		indent = indent~"	";
 		retstr ~= indent~"// deal with unknown fields\n";
-		retstr ~= indent~"byte[]ufields;\n";
+		retstr ~= indent~"ubyte[]ufields;\n";
 		// fill the class with goodies!
 		// first, we'll do the enums!
 		foreach(pbenum;enum_defs) {
@@ -63,23 +71,23 @@ struct PBMessage {
 		// deal with what little we need to do for extensions
 		retstr ~= extensions.genExtString(indent~"static ");
 		// include a static opcall to do deserialization to make coding simpler
-		retstr ~= indent~"static "~name~" opCall(ref byte[]input) {\n";
+		retstr ~= indent~"static "~name~" opCall(ref ubyte[]input) {\n";
 		retstr ~= indent~"	return Deserialize(input);\n";
 		retstr ~= indent~"}\n";
-		
+
 		// guaranteed to work, since we tack on a tab earlier
 		indent = indent[0..$-1];
 		retstr ~= indent~"}\n";
 		return retstr;
 	}
 
-	char[]genSerCode(char[]indent) {
-		char[]ret = "";
+	string genSerCode(string indent) {
+		string ret = "";
 		// use -1 as a default value, since a nibble can not produce that number
-		ret ~= indent~"byte[]Serialize(int field = -1) {\n";
+		ret ~= indent~"ubyte[]Serialize(int field = -1) {\n";
 		indent = indent~"	";
 		// codegen is fun!
-		ret ~= indent~"byte[]ret;\n";
+		ret ~= indent~"ubyte[]ret;\n";
 		// serialization code goes here
 		foreach(pbchild;children) {
 			ret ~= pbchild.genSerLine(indent);
@@ -103,16 +111,16 @@ struct PBMessage {
 		return ret;
 	}
 
-	char[]genDesCode(char[]indent) {
-		char[]ret = "";
+	string genDesCode(string indent) {
+		string ret = "";
 		// add comments
 		ret ~= indent~"// if we're root, we can assume we own the whole string\n";
 		ret ~= indent~"// if not, the first thing we need to do is pull the length that belongs to us\n";
-		ret ~= indent~"static "~name~" Deserialize(ref byte[]manip,bool isroot=true) {return new "~name~"(manip,isroot);}\n";
+		ret ~= indent~"static "~name~" Deserialize(ref ubyte[]manip,bool isroot=true) {return new "~name~"(manip,isroot);}\n";
 		ret ~= indent~"this(){}\n";
-		ret ~= indent~"this(ref byte[]manip,bool isroot=true) {\n";
+		ret ~= indent~"this(ref ubyte[]manip,bool isroot=true) {\n";
 		indent = indent~"	";
-		ret ~= indent~"byte[]input = manip;\n";
+		ret ~= indent~"ubyte[]input = manip;\n";
 
 		ret ~= indent~"// cut apart the input string\n";
 		ret ~= indent~"if (!isroot) {\n";
@@ -157,34 +165,36 @@ struct PBMessage {
 	}
 
 	// string-modifying constructor
-	static PBMessage opCall(ref char[]pbstring)
+	static PBMessage opCall(ref ParserData pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
 		// things we currently support in a message: messages, enums, and children(repeated, required, optional)
 		// first things first, rip off "message"
-		pbstring = pbstring["message".length..$];
+		pbstring.input.skipOver("message");
 		// now rip off the next set of whitespace
 		pbstring = stripLWhite(pbstring);
 		// get message name
-		char[]name = stripValidChars(CClass.Identifier,pbstring);
+		string name = stripValidChars(CClass.Identifier,pbstring);
 		PBMessage message;
 		message.name = name;
 		// rip off whitespace
 		pbstring = stripLWhite(pbstring);
 		// make sure the next character is the opening {
-		if (pbstring[0] != '{') {
-			throw new PBParseException("Message Definition","Expected next character to be '{'. You may have a space in your message name: "~name);
+		if(!pbstring.input.skipOver("{")) {
+			throw new PBParseException("Message Definition","Expected next character to be '{'. You may have a space in your message name: "~name, pbstring.line);
 		}
-		// rip off opening {
-		pbstring = pbstring[1..$];
+
 		// prep for loop spinup by removing extraneous whitespace
 		pbstring = stripLWhite(pbstring);
+		CommentManager storeComment;
+
 		// now we're ready to enter the loop and parse children
 		while(pbstring[0] != '}') {
 			// start parsing, we shouldn't have any whitespace here
-			PBTypes type = typeNextElement(pbstring);
-			switch(type){
+			storeComment.lastElementType = typeNextElement(pbstring);
+			storeComment.lastElementLine = pbstring.line;
+			switch(storeComment.lastElementType){
 			case PBTypes.PB_Message:
 				message.message_defs ~= PBMessage(pbstring);
 				break;
@@ -203,26 +213,57 @@ struct PBMessage {
 				message.children ~= PBChild(pbstring);
 				break;
 			case PBTypes.PB_Comment:
-				stripValidChars(CClass.Comment,pbstring);
+				// Preserve at least one spacing in comments
+				if(storeComment.line+1 < pbstring.line)
+					if(!storeComment.comments.empty)
+						storeComment ~= "";
+				storeComment ~= stripValidChars(CClass.Comment,pbstring);
+				storeComment.line = pbstring.line;
 				break;
 			case PBTypes.PB_Option:
 				// rip of "option" and leading whitespace
-				pbstring = stripLWhite(pbstring["option".length..$]);
+                pbstring.input.skipOver("option");
+				pbstring = stripLWhite(pbstring);
 				ripOption(pbstring);
 				break;
 			default:
-				throw new PBParseException("Message Definition","Only extend, service, package, and message are allowed here.");
+				throw new PBParseException("Message Definition","Only extend, service, package, and message are allowed here.", pbstring.line);
 			}
+			pbstring.input.skipOver(";");
 			// this needs to stay at the end
 			pbstring = stripLWhite(pbstring);
+
+			// Attach Comments to elements
+			if(!storeComment.comments.empty) {
+				if(storeComment.line == storeComment.lastElementLine
+				   || storeComment.line+3 > storeComment.lastElementLine) {
+					switch(storeComment.lastElementType) {
+						case PBTypes.PB_Comment:
+							break;
+						case PBTypes.PB_Message:
+							message.message_defs.back.comments = storeComment;
+							goto default;
+						case PBTypes.PB_Enum:
+							message.enum_defs.back.comments = storeComment;
+							goto default;
+						case PBTypes.PB_Repeated:
+						case PBTypes.PB_Required:
+						case PBTypes.PB_Optional:
+							message.children.back.comments = storeComment;
+							goto default;
+						default:
+							storeComment.comments = null;
+					}
+				}
+			}
 		}
 		// rip off the }
-		pbstring = pbstring[1..$];
+		pbstring.input.skipOver("}");
 		return message;
 	}
 
-	char[]genMergeCode(char[]indent) {
-		char[]ret;
+	string genMergeCode(string indent) {
+		string ret;
 		ret ~= indent~"void MergeFrom("~name~" merger) {\n";
 		indent = indent~"	";
 		// merge code
@@ -236,18 +277,18 @@ struct PBMessage {
 		return ret;
 	}
 
-	void ripExtenRange(ref char[]pbstring) {
+	void ripExtenRange(ref ParserData pbstring) {
 		pbstring = pbstring["extensions".length..$];
 		pbstring = stripLWhite(pbstring);
 		allow_exten ext;
 		// expect next to be numeric
-		char[]tmp = stripValidChars(CClass.Numeric,pbstring);
-		if (!tmp.length) throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range");
-		ext.min = cast(int)atoi(tmp);
+		string tmp = stripValidChars(CClass.Numeric,pbstring);
+		if (!tmp.length) throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range", pbstring.line);
+		ext.min = to!int(tmp);
 		pbstring = stripLWhite(pbstring);
 		// make sure we have "to"
 		if (pbstring[0..2].icmp("to") != 0) {
-			throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range");
+			throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range", pbstring.line);
 		}
 		// rip of "to"
 		pbstring = pbstring[2..$];
@@ -259,182 +300,56 @@ struct PBMessage {
 			ext.max = (1<<29)-1;
 		} else {
 			tmp = stripValidChars(CClass.Numeric,pbstring);
-			if (!tmp.length) throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range");
-			ext.max = cast(int)atoi(tmp);
+			if (!tmp.length) throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range", pbstring.line);
+			ext.max = to!int(tmp);
 			if (ext.max > (1<<29)-1) {
-				throw new PBParseException("Message Parse("~name~" extension range)","Max defined extension value is greater than allowable max");
+				throw new PBParseException("Message Parse("~name~" extension range)","Max defined extension value is greater than allowable max", pbstring.line);
 			}
 		}
 		pbstring = stripLWhite(pbstring);
 		// check for ; and rip it off
 		if (pbstring[0] != ';') {
-			throw new PBParseException("Message Parse("~name~" extension range)","Missing ; at end of extension range definition");
+			throw new PBParseException("Message Parse("~name~" extension range)","Missing ; at end of extension range definition", pbstring.line);
 		}
 		pbstring = pbstring[1..$];
 		exten_sets ~= ext;
 	}
 }
 
-char[]genExtString(PBExtension[]extens,char[]indent) {
+string genExtString(PBExtension[]extens,string indent) {
 	// we just need to generate a list of static const variables
-	char[]ret;
+	string ret;
 	foreach(exten;extens) foreach(child;exten.children) {
-		ret ~= indent~"const int "~child.name~" = "~toString(child.index)~";\n";
+		ret ~= indent~"const int "~child.name~" = "~to!string(child.index)~";\n";
 	}
 	return ret;
 }
 
 unittest {
-	char[]instring = "message glorm{\noptional int32 i32test = 1;\nmessage simple { }\noptional simple quack = 5;\n}\n";
-	char[]compstr = 
-"class glorm {
-	// deal with unknown fields
-	byte[]ufields;
-	static class simple {
-		// deal with unknown fields
-		byte[]ufields;
-		byte[]Serialize(int field = -1) {
-			byte[]ret;
-			ret ~= ufields;
-			// take care of header and length generation if necessary
-			if (field != -1) {
-				ret = genHeader(field,2)~toVarint(ret.length,field)[1..$]~ret;
-			}
-			return ret;
-		}
-		// if we're root, we can assume we own the whole string
-		// if not, the first thing we need to do is pull the length that belongs to us
-		static simple Deserialize(ref byte[]manip,bool isroot=true) {
-			auto retobj = new simple;
-			byte[]input = manip;
-			// cut apart the input string
-			if (!isroot) {
-				uint len = fromVarint!(uint)(manip);
-				input = manip[0..len];
-				manip = manip[len..$];
-			}
-			while(input.length) {
-				int header = fromVarint!(int)(input);
-				switch(getFieldNumber(header)) {
-				default:
-					// rip off unknown fields
-					retobj.ufields ~= _toVarint(header)~ripUField(input,getWireType(header));
-					break;
-				}
-			}
-			return retobj;
-		}
-		void MergeFrom(simple merger) {
-		}
-		static simple opCall(ref byte[]input) {
-			return Deserialize(input);
-		}
-	}
-	int _i32test;
-	int i32test() {
-		return _i32test;
-	}
-	void i32test(int input_var) {
-		_i32test = input_var;
-		_has_i32test = true;
-	}
-	bool _has_i32test = false;
-	bool has_i32test () {
-		return _has_i32test;
-	}
-	void clear_i32test () {
-		_has_i32test = false;
-	}
-	simple _quack;
-	simple quack() {
-		return _quack;
-	}
-	void quack(simple input_var) {
-		_quack = input_var;
-		_has_quack = true;
-	}
-	bool _has_quack = false;
-	bool has_quack () {
-		return _has_quack;
-	}
-	void clear_quack () {
-		_has_quack = false;
-	}
-	byte[]Serialize(int field = -1) {
-		byte[]ret;
-		ret ~= toVarint(i32test,1);
-		static if (is(simple:Object)) {
-			ret ~= quack.Serialize(5);
-		} else {
-			// this is an enum, almost certainly
-			ret ~= toVarint!(int)(quack,5);
-		}
-		ret ~= ufields;
-		// take care of header and length generation if necessary
-		if (field != -1) {
-			ret = genHeader(field,2)~toVarint(ret.length,field)[1..$]~ret;
-		}
-		return ret;
-	}
-	// if we're root, we can assume we own the whole string
-	// if not, the first thing we need to do is pull the length that belongs to us
-	static glorm Deserialize(ref byte[]manip,bool isroot=true) {
-		auto retobj = new glorm;
-		byte[]input = manip;
-		// cut apart the input string
-		if (!isroot) {
-			uint len = fromVarint!(uint)(manip);
-			input = manip[0..len];
-			manip = manip[len..$];
-		}
-		while(input.length) {
-			int header = fromVarint!(int)(input);
-			switch(getFieldNumber(header)) {
-			case 1:
-				if (getWireType(header) == 0) {
-					retobj._i32test = fromVarint!(int)(input);
-				} else {
-					throw new Exception(\"Invalid wiretype \"~std.string.toString(getWireType(header))~\" for variable type int32\");
-				}
-				retobj._has_i32test = true;
-				break;
-			case 5:
-				static if (is(simple:Object)) {
-					retobj._quack = simple.Deserialize(input,false);
-				} else {
-					// this is an enum, almost certainly
-					if (getWireType(header) == 0) {
-						retobj._quack = fromVarint!(int)(input);
-					} else {
-						throw new Exception(\"Invalid wiretype \"~std.string.toString(getWireType(header))~\" for variable type simple\");
-					}
-				}
-				retobj._has_quack = true;
-				break;
-			default:
-				// rip off unknown fields
-				retobj.ufields ~= _toVarint(header)~ripUField(input,getWireType(header));
-				break;
-			}
-		}
-		return retobj;
-	}
-	void MergeFrom(glorm merger) {
-		if (merger.has_i32test) i32test = merger.i32test;
-		if (merger.has_quack) quack = merger.quack;
-	}
-	static glorm opCall(ref byte[]input) {
-		return Deserialize(input);
-	}
-}
-";
+	enum instring = ParserData("message glorm{\noptional int32 i32test = 1;\nmessage simple { }\noptional simple quack = 5;\n}\n");
+
+    PBMessage PBCompileTime(ParserData pbstring) {
+        return PBMessage(pbstring);
+    }
+
 	writefln("unittest ProtocolBuffer.pbmessage");
-	auto msg = PBMessage(instring);
-	debug {
-		writefln("Correct output:\n%s",compstr);
-		writefln("Generated output:\n%s",msg.toDString(""));
-	}
-	assert(msg.toDString("") == compstr);
-	debug writefln("");
+	enum msg = PBCompileTime(instring);
+    assert(msg.name == "glorm");
+    assert(msg.message_defs[0].name == "simple");
+    assert(msg.children.length == 2);
+
+	auto str = ParserData("message Person {
+		// I comment types
+		message PhoneNumber {
+		required string number = 1;
+		// Their type of phone
+		optional PhoneType type = 2 ;
+	}}");
+
+	auto ms = PBMessage(str);
+    assert(ms.name == "Person");
+    assert(ms.message_defs[0].name == "PhoneNumber");
+    assert(ms.message_defs[0].comments[0] == "// I comment types");
+    assert(ms.message_defs[0].children[1].comments[0] == "// Their type of phone");
 }
 

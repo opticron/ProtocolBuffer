@@ -3,24 +3,39 @@
 // code to read and write the specified format
 module ProtocolBuffer.pbenum;
 import ProtocolBuffer.pbgeneral;
-import std.string;
+
+import std.algorithm;
+import std.conv;
+import std.range;
 import std.stdio;
+import std.string;
+version(unittest) import std.regex;
 
 struct PBEnum {
-	char[]name;
-	char[][int]values;
-	char[]toDString(char[]indent) {
-		char[]retstr = "";
+	string name;
+	string[] comments;
+	string[][int] valueComments;
+	string[int] values;
+	string toDString(string indent) {
+		string retstr = "";
+		foreach(c; comments) {
+			retstr ~= indent ~ (c.empty ? "":"/") ~ c ~ "\n";
+		}
 		retstr ~= indent~"enum "~name~" {\n";
 		foreach (key,value;values) {
-			retstr ~= indent~"	"~value~" = "~toString(key)~",\n";
+			if(key in valueComments)
+				foreach(c; valueComments[key])
+					retstr ~= indent ~ "/" ~ c ~ "\n";
+
+			retstr ~= indent~"\t"~value~" = "~to!string(key)~",\n";
+
 		}
 		retstr ~= indent~"}\n";
 		return retstr;
 	}
 
 	// string-modifying constructor
-	static PBEnum opCall(ref char[]pbstring)
+	static PBEnum opCall(ref ParserData pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
@@ -30,79 +45,116 @@ struct PBEnum {
 		pbstring = stripLWhite(pbstring);
 		// grab name
 		pbenum.name = stripValidChars(CClass.Identifier,pbstring);
-		if (!pbenum.name.length) throw new PBParseException("Enum Definition","Could not pull name from definition.");
-		if (!validIdentifier(pbenum.name)) throw new PBParseException("Enum Definition","Invalid name identifier "~pbenum.name~".");
+		if (!pbenum.name.length) throw new PBParseException("Enum Definition","Could not pull name from definition.", pbstring.line);
+		if (!validIdentifier(pbenum.name)) throw new PBParseException("Enum Definition","Invalid name identifier "~pbenum.name~".", pbstring.line);
 		pbstring = stripLWhite(pbstring);
-		// make sure the next character is the opening {
-		if (pbstring[0] != '{') {
-			throw new PBParseException("Enum Definition("~pbenum.name~")","Expected next character to be '{'. You may have a space in your enum name: "~pbenum.name);
+
+		// rip out the comment...
+		if (pbstring.length>1 && pbstring[0..2] == "//") {
+			pbenum.comments ~= stripValidChars(CClass.Comment,pbstring);
+			pbstring = stripLWhite(pbstring);
 		}
-		// rip off opening {
-		pbstring = pbstring[1..$];
+
+		// make sure the next character is the opening {
+		if (!pbstring.input.skipOver("{")) {
+			throw new PBParseException("Enum Definition("~pbenum.name~")","Expected next character to be '{'. You may have a space in your enum name: "~pbenum.name, pbstring.line);
+		}
+
+		CommentManager storeComment;
+		int elementNum;
+
+		pbstring = stripLWhite(pbstring);
 		// now we're ready to enter the loop and parse children
 		while(pbstring[0] != '}') {
-			pbstring = stripLWhite(pbstring);
-			if (pbstring.length>1 && pbstring[0..2] == "//") {
+			if (pbstring.input.skipOver("option")) {
+				pbstring = stripLWhite(pbstring);
+				writeln("Ignoring option ",
+				ripOption(pbstring).name);
+				pbstring.input.skipOver(";");
+			}
+			else if (pbstring.length>1 && pbstring[0..2] == "//") {
 				// rip out the comment...
-				stripValidChars(CClass.Comment,pbstring);
+				storeComment ~= stripValidChars(CClass.Comment,pbstring);
+				storeComment.line = pbstring.line;
 			} else {
 				// start parsing, we shouldn't have any whitespace here
-				pbenum.grabEnumValue(pbstring);
+				elementNum = pbenum.grabEnumValue(pbstring);
+				storeComment.lastElementLine = pbstring.line;
+				if(!storeComment.comments.empty) {
+					pbenum.valueComments[elementNum] = storeComment;
+					storeComment.comments = null;
+				}
 			}
+			if(storeComment.line == storeComment.lastElementLine) {
+				pbenum.valueComments[elementNum] = storeComment;
+				storeComment.comments = null;
+			}
+			pbstring = stripLWhite(pbstring);
 		}
 		// rip off the }
 		pbstring = pbstring[1..$];
 		return pbenum;
 	}
 
-	void grabEnumValue(ref char[]pbstring)
+	/**
+	 * returns:
+	 *     enum entry value
+	 */
+	int grabEnumValue(ref ParserData pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
 		// whitespace has already been ripped
 		// snag item name
-		char[]tmp = stripValidChars(CClass.Identifier,pbstring);
-		if (!tmp.length) throw new PBParseException("Enum Definition("~name~")","Could not pull item name from definition.");
-		if (!validIdentifier(tmp)) throw new PBParseException("Enum Definition("~name~")","Invalid item name identifier "~tmp~".");
-		// check for options
-		if (tmp == "option") {
-			writefln("Ignoring option");
-			ripOption(pbstring);
-			return;
-		}
+		string tmp = stripValidChars(CClass.Identifier,pbstring);
+		if (!tmp.length) throw new PBParseException("Enum Definition("~name~")","Could not pull item name from definition.", pbstring.line);
+		if (!validIdentifier(tmp)) throw new PBParseException("Enum Definition("~name~")","Invalid item name identifier "~tmp~".", pbstring.line);
 		pbstring = stripLWhite(pbstring);
 		// ensure that the name doesn't already exist
-		foreach(val;values.values) if (tmp == val) throw new PBParseException("Enum Definition("~name~")","Multiply defined element("~tmp~")");
+		foreach(val;values.values) if (tmp == val) throw new PBParseException("Enum Definition("~name~")","Multiple defined element("~tmp~")", pbstring.line);
 		// make sure to traverse the '='
-		if (pbstring[0] != '=') throw new PBParseException("Enum Definition("~name~"."~tmp~")","Expected '=', but got something else. You may have a space in one of your enum items.");
-		pbstring = pbstring[1..$];
+		if (!pbstring.input.skipOver("=")) throw new PBParseException("Enum Definition("~name~"."~tmp~")","Expected '=', but got something else. You may have a space in one of your enum items.", pbstring.line);
+
 		pbstring = stripLWhite(pbstring);
 		// now parse a numeric
-		char[]num = stripValidChars(CClass.Numeric,pbstring);
-		if (!num.length) throw new PBParseException("Enum Definition("~name~"."~tmp~")","Could not pull numeric enum value.");
-		values[cast(int)atoi(num)] = tmp;
+		string num = stripValidChars(CClass.Numeric,pbstring);
+		if (!num.length) throw new PBParseException("Enum Definition("~name~"."~tmp~")","Could not pull numeric enum value.", pbstring.line);
+		values[to!int(num)] = tmp;
 		pbstring = stripLWhite(pbstring);
 		// deal with inline options
 		if (pbstring[0] == '[') {
 			ripOptions(pbstring);
 		}
 		// make sure we snatch a semicolon
-		if (pbstring[0] == ';') {
-			// we're done here
-			pbstring = pbstring[1..$];
-			return;
-		}
-		throw new PBParseException("Enum Definition("~name~"."~tmp~"="~num~")","Expected ';'.");
+		if (!pbstring.input.skipOver(";"))
+			throw new PBParseException("Enum Definition("~name~"."~tmp~"="~num~")","Expected ';'.", pbstring.line);
+
+		return to!int(num);
 	}
 }
 
 unittest {
 	writefln("unittest ProtocolBuffer.pbenum");
 	// the leading whitespace is assumed to already have been stripped
-	char[]estring = "enum potato {TOTALS = 1;JUNK= 5 ; ALL =3;}";
+	auto estring = ParserData("enum potato {TOTALS = 1;JUNK= 5 ; ALL =3;}");
 	auto edstring = PBEnum(estring).toDString("");
-	debug writefln("%s",edstring);
-	assert(edstring == "enum potato {\n	TOTALS = 1,\n	ALL = 3,\n	JUNK = 5,\n}\n");
-	debug writefln("");
+    assert(edstring.match(regex(r"TOTALS = 1")).empty == false);
+    assert(edstring.match(regex(r"ALL = 3")).empty == false);
+    assert(edstring.match(regex(r"JUNK = 5")).empty == false);
+
+	estring = "enum potato // With comment
+    {
+        option allow_alias = true;
+	TOTALS = 1; // This is total
+	// Just junk
+	// is all
+	JUNK= 5 ;
+	ALL =3;
+}";
+	auto enumValue = PBEnum(estring);
+	assert(enumValue.comments[0] == "// With comment");
+	assert(enumValue.valueComments[1][0] == "// This is total");
+	assert(enumValue.valueComments[5][0] == "// Just junk");
+	assert(enumValue.valueComments[5][1] == "// is all");
 }
 
