@@ -6,11 +6,11 @@ import std.string;
 import std.stdio;
 
 struct PBExtension {
-	char[]name;
+	string name;
 	PBChild[]children;
 
 	// string-modifying constructor
-	static PBExtension opCall(ref char[]pbstring)
+	static PBExtension opCall(ref ParserData pbstring)
 	in {
 		assert(pbstring.length);
 	} body {
@@ -20,14 +20,14 @@ struct PBExtension {
 		// now rip off the next set of whitespace
 		pbstring = stripLWhite(pbstring);
 		// get message name
-		char[]name = stripValidChars(CClass.MultiIdentifier,pbstring);
+		string name = stripValidChars(CClass.MultiIdentifier,pbstring);
 		PBExtension exten;
 		exten.name = name;
 		// rip off whitespace
 		pbstring = stripLWhite(pbstring);
 		// make sure the next character is the opening {
 		if (pbstring[0] != '{') {
-			throw new PBParseException("Message Definition","Expected next character to be '{'. You may have a space in your message name: "~name);
+			throw new PBParseException("Message Definition","Expected next character to be '{'. You may have a space in your message name: "~name, pbstring.line);
 		}
 		// rip off opening {
 		pbstring = pbstring[1..$];
@@ -47,11 +47,11 @@ struct PBExtension {
 }
 
 unittest {
-	char[]instr = 
-"extend Foo {
+	auto instr =
+ParserData("extend Foo {
 	optional clunker blah = 1;
 }
-";
+");
 	writefln("unittest ProtocolBuffer.pbextension");
 	auto exten = PBExtension(instr);
 	debug writefln("Checking PBExtension class correctness");
