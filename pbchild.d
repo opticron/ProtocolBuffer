@@ -404,7 +404,6 @@ ubyte wTFromType(string type) {
 	case "string","bytes":
 		return cast(ubyte)2;
 	default:
-		return cast(ubyte)-1;
 	}
-	return cast(ubyte)-1;
+	throw new Exception("Type Classification - Unknown type string: " ~ type);
 }
