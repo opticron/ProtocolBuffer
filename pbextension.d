@@ -16,7 +16,7 @@ struct PBExtension {
 	} body {
 		// things we currently support in a message: messages, enums, and children(repeated, required, optional)
 		// first things first, rip off "message"
-		pbstring = pbstring["extend".length..$];
+		pbstring = pbstring["extend".length..pbstring.length];
 		// now rip off the next set of whitespace
 		pbstring = stripLWhite(pbstring);
 		// get message name
@@ -30,7 +30,7 @@ struct PBExtension {
 			throw new PBParseException("Message Definition","Expected next character to be '{'. You may have a space in your message name: "~name, pbstring.line);
 		}
 		// rip off opening {
-		pbstring = pbstring[1..$];
+		pbstring = pbstring[1..pbstring.length];
 		// prep for loop spinup by removing extraneous whitespace
 		pbstring = stripLWhite(pbstring);
 		// now we're ready to enter the loop and parse children
@@ -41,7 +41,7 @@ struct PBExtension {
 			pbstring = stripLWhite(pbstring);
 		}
 		// rip off the }
-		pbstring = pbstring[1..$];
+		pbstring = pbstring[1..pbstring.length];
 		return exten;
 	}
 }
