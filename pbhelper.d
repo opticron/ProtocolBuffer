@@ -4,7 +4,32 @@ import std.conv;
 import std.stdio;
 import std.string;
 import std.traits;
-version(unittest) import std.algorithm, std.range;
+
+version(D_Version2) {
+} else {
+    int to(T)(string v) {
+        return atoi(v);
+    }
+
+    string to(T)(int v) {
+        return toString(v);
+    }
+
+    string to(T, S)(ulong v, S redix) {
+        return toString(v, redix);
+    }
+
+    bool empty(T)(T[] v) {
+        return !v.length;
+    }
+    bool skipOver(ref string str, string c) {
+        if(str[0..c.length] == c) {
+            str = str[c.length..$];
+            return true;
+        }
+        return false;
+    }
+}
 
 // here is where all the encodings are defined and translated between bytes and real representations
 
@@ -63,9 +88,9 @@ in {
 	for (x = 0;x<=input.length;x++) {
 		if (x == input.length) throw new Exception(
 			"Found no end to varint ubyte string starting with: "~
-			to!string(cast(ulong)input[0],16u)~" "~
-			(input.length>1?to!string(cast(ulong)input[1],16u):"")~" "~
-			(input.length>2?to!string(cast(ulong)input[2],16u):""));
+			to!(string)(cast(ulong)input[0],16u)~" "~
+			(input.length>1?to!(string)(cast(ulong)input[1],16u):"")~" "~
+			(input.length>2?to!(string)(cast(ulong)input[2],16u):""));
 
 		if (!(input[x]>>7)) {
 			// we have a ubyte with an unset upper bit! huzzah!
@@ -77,7 +102,11 @@ in {
 	}
 
 	long output = 0;
-	for (x = to!int(tmp.length-1);x>=0;x--) {
+	version(D_Version2)
+		auto starting = to!(int)(tmp.length-1);
+	else
+		auto starting = tmp.length-1;
+	for (x = starting;x>=0;x--) {
 		output |= (tmp[x]&0b1111111);
 		if (x==0) {
 			// we're done, so jump out so we can return values
@@ -231,8 +260,7 @@ unittest {
 }
 
 // string functions!
-ubyte[]toByteString(T)(T[]input,int field)
-    if(is(Unqual!T == char) || is(Unqual!T == ubyte)) {
+ubyte[]toByteString(T)(T[]input,int field) {
 	// we need to rip off the generated header ubyte for code reuse, this could be done better
 	ubyte[]tmp = _toVarint(input.length);
 	return genHeader(field,2)~tmp~cast(ubyte[])input;
@@ -279,9 +307,9 @@ ubyte[]ripUField(ref ubyte[]input,int wiretype) {
 		return tmp;
 	default:
 		// shit is broken....
-		throw new Exception("Can't deal with wiretype "~to!string(wiretype));
+		throw new Exception("Can't deal with wiretype "~to!(string)(wiretype));
 	}
-	throw new Exception("Wiretype "~to!string(wiretype)~" fell through switch");
+	throw new Exception("Wiretype "~to!(string)(wiretype)~" fell through switch");
 }
 
 // handle packed fields
@@ -319,8 +347,14 @@ unittest {
 	ubyte[]cmp = cast(ubyte[])[0x22,0x6,0x3,0x8e,0x2,0x9e,0xa7,0x5];
 	ubyte[]tmp = toPacked!(int[],toVarint)(test,cast(ubyte)4);
 	assert(tmp.length == 8);
-	debug writeln(map!(a => format("%x", a))(cmp));
-	debug writeln(map!(a => format("%x", a))(tmp));
+	version(D_Version2) {
+		mixin("import std.algorithm, std.range;");
+		debug writeln(map!((a) { return format("%x", a); })(cmp));
+		debug writeln(map!((a) { return format("%x", a); })(tmp));
+	} else {
+		debug writefln("%x",cmp);
+		debug writefln("%x",tmp);
+	}
 	assert(tmp == cmp);
 	// rip off header ubyte
 	tmp = tmp[1..$];

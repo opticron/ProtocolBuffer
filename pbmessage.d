@@ -8,9 +8,13 @@ import ProtocolBuffer.pbenum;
 import ProtocolBuffer.pbchild;
 import ProtocolBuffer.pbextension;
 
-import std.algorithm;
+version(D_Version2) {
+	import std.algorithm;
+	import std.range;
+} else
+	import ProtocolBuffer.pbhelper;
+
 import std.conv;
-import std.range;
 import std.stdio;
 import std.string;
 
@@ -41,7 +45,7 @@ struct PBMessage {
 	string toDString(string indent) {
 		string retstr = "";
 		foreach(c; comments)
-			retstr ~= indent ~ (c.empty ? "":"/") ~ c ~ "\n";
+			retstr ~= indent ~ (c.empty() ? "":"/") ~ c ~ "\n";
 		retstr ~= indent~(indent.length?"static ":"")~"class "~name~" {\n";
 		indent = indent~"	";
 		retstr ~= indent~"// deal with unknown fields\n";
@@ -215,14 +219,14 @@ struct PBMessage {
 			case PBTypes.PB_Comment:
 				// Preserve at least one spacing in comments
 				if(storeComment.line+1 < pbstring.line)
-					if(!storeComment.comments.empty)
+					if(!storeComment.comments.empty())
 						storeComment ~= "";
 				storeComment ~= stripValidChars(CClass.Comment,pbstring);
 				storeComment.line = pbstring.line;
 				break;
 			case PBTypes.PB_Option:
 				// rip of "option" and leading whitespace
-                pbstring.input.skipOver("option");
+				pbstring.input.skipOver("option");
 				pbstring = stripLWhite(pbstring);
 				ripOption(pbstring);
 				break;
@@ -234,22 +238,25 @@ struct PBMessage {
 			pbstring = stripLWhite(pbstring);
 
 			// Attach Comments to elements
-			if(!storeComment.comments.empty) {
+			if(!storeComment.comments.empty()) {
 				if(storeComment.line == storeComment.lastElementLine
 				   || storeComment.line+3 > storeComment.lastElementLine) {
 					switch(storeComment.lastElementType) {
 						case PBTypes.PB_Comment:
 							break;
 						case PBTypes.PB_Message:
-							message.message_defs.back.comments = storeComment;
+							message.message_defs[$-1].comments
+								= storeComment.comments;
 							goto default;
 						case PBTypes.PB_Enum:
-							message.enum_defs.back.comments = storeComment;
+							message.enum_defs[$-1].comments
+								= storeComment.comments;;
 							goto default;
 						case PBTypes.PB_Repeated:
 						case PBTypes.PB_Required:
 						case PBTypes.PB_Optional:
-							message.children.back.comments = storeComment;
+							message.children[$-1].comments
+								= storeComment.comments;
 							goto default;
 						default:
 							storeComment.comments = null;
@@ -278,30 +285,30 @@ struct PBMessage {
 	}
 
 	void ripExtenRange(ref ParserData pbstring) {
-		pbstring = pbstring["extensions".length..$];
+		pbstring = pbstring["extensions".length..pbstring.length];
 		pbstring = stripLWhite(pbstring);
 		allow_exten ext;
 		// expect next to be numeric
 		string tmp = stripValidChars(CClass.Numeric,pbstring);
 		if (!tmp.length) throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range", pbstring.line);
-		ext.min = to!int(tmp);
+		ext.min = to!(int)(tmp);
 		pbstring = stripLWhite(pbstring);
 		// make sure we have "to"
-		if (pbstring[0..2].icmp("to") != 0) {
+		if (pbstring.input[0..2].icmp("to") != 0) {
 			throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range", pbstring.line);
 		}
 		// rip of "to"
-		pbstring = pbstring[2..$];
+		pbstring = pbstring[2..pbstring.length];
 		pbstring = stripLWhite(pbstring);
 		// check for "max" and rip it if necessary
-		if (pbstring[0..3].icmp("max") == 0) {
-			pbstring = pbstring[3..$];
+		if (pbstring.input[0..3].icmp("max") == 0) {
+			pbstring = pbstring[3..pbstring.length];
 			// (1<<29)-1 is defined as the maximum extension value
 			ext.max = (1<<29)-1;
 		} else {
 			tmp = stripValidChars(CClass.Numeric,pbstring);
 			if (!tmp.length) throw new PBParseException("Message Parse("~name~" extension range)","Unable to rip min and max for extension range", pbstring.line);
-			ext.max = to!int(tmp);
+			ext.max = to!(int)(tmp);
 			if (ext.max > (1<<29)-1) {
 				throw new PBParseException("Message Parse("~name~" extension range)","Max defined extension value is greater than allowable max", pbstring.line);
 			}
@@ -311,7 +318,7 @@ struct PBMessage {
 		if (pbstring[0] != ';') {
 			throw new PBParseException("Message Parse("~name~" extension range)","Missing ; at end of extension range definition", pbstring.line);
 		}
-		pbstring = pbstring[1..$];
+		pbstring = pbstring[1..pbstring.length];
 		exten_sets ~= ext;
 	}
 }
@@ -320,23 +327,19 @@ string genExtString(PBExtension[]extens,string indent) {
 	// we just need to generate a list of static const variables
 	string ret;
 	foreach(exten;extens) foreach(child;exten.children) {
-		ret ~= indent~"const int "~child.name~" = "~to!string(child.index)~";\n";
+		ret ~= indent~"const int "~child.name~" = "~to!(string)(child.index)~";\n";
 	}
 	return ret;
 }
 
 unittest {
-	enum instring = ParserData("message glorm{\noptional int32 i32test = 1;\nmessage simple { }\noptional simple quack = 5;\n}\n");
-
-    PBMessage PBCompileTime(ParserData pbstring) {
-        return PBMessage(pbstring);
-    }
+	auto instring = ParserData("message glorm{\noptional int32 i32test = 1;\nmessage simple { }\noptional simple quack = 5;\n}\n");
 
 	writefln("unittest ProtocolBuffer.pbmessage");
-	enum msg = PBCompileTime(instring);
-    assert(msg.name == "glorm");
-    assert(msg.message_defs[0].name == "simple");
-    assert(msg.children.length == 2);
+	auto msg = PBMessage(instring);
+	assert(msg.name == "glorm");
+	assert(msg.message_defs[0].name == "simple");
+	assert(msg.children.length == 2);
 
 	auto str = ParserData("message Person {
 		// I comment types
@@ -347,9 +350,9 @@ unittest {
 	}}");
 
 	auto ms = PBMessage(str);
-    assert(ms.name == "Person");
-    assert(ms.message_defs[0].name == "PhoneNumber");
-    assert(ms.message_defs[0].comments[0] == "// I comment types");
-    assert(ms.message_defs[0].children[1].comments[0] == "// Their type of phone");
+	assert(ms.name == "Person");
+	assert(ms.message_defs[0].name == "PhoneNumber");
+	assert(ms.message_defs[0].comments[0] == "// I comment types");
+	assert(ms.message_defs[0].children[1].comments[0] == "// Their type of phone");
 }
 

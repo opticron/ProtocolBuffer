@@ -4,12 +4,16 @@
 module ProtocolBuffer.pbenum;
 import ProtocolBuffer.pbgeneral;
 
-import std.algorithm;
+version(D_Version2) {
+	import std.algorithm;
+	import std.range;
+	import std.regex;
+} else
+	import ProtocolBuffer.pbhelper;
+
 import std.conv;
-import std.range;
 import std.stdio;
 import std.string;
-version(unittest) import std.regex;
 
 struct PBEnum {
 	string name;
@@ -19,7 +23,7 @@ struct PBEnum {
 	string toDString(string indent) {
 		string retstr = "";
 		foreach(c; comments) {
-			retstr ~= indent ~ (c.empty ? "":"/") ~ c ~ "\n";
+			retstr ~= indent ~ (c.empty() ? "":"/") ~ c ~ "\n";
 		}
 		retstr ~= indent~"enum "~name~" {\n";
 		foreach (key,value;values) {
@@ -27,7 +31,7 @@ struct PBEnum {
 				foreach(c; valueComments[key])
 					retstr ~= indent ~ "/" ~ c ~ "\n";
 
-			retstr ~= indent~"\t"~value~" = "~to!string(key)~",\n";
+			retstr ~= indent~"\t"~value~" = "~to!(string)(key)~",\n";
 
 		}
 		retstr ~= indent~"}\n";
@@ -41,7 +45,7 @@ struct PBEnum {
 	} body {
 		PBEnum pbenum;
 		// strip of "enum" and following whitespace
-		pbstring = pbstring["enum".length..$];
+		pbstring = pbstring["enum".length..pbstring.length];
 		pbstring = stripLWhite(pbstring);
 		// grab name
 		pbenum.name = stripValidChars(CClass.Identifier,pbstring);
@@ -50,7 +54,7 @@ struct PBEnum {
 		pbstring = stripLWhite(pbstring);
 
 		// rip out the comment...
-		if (pbstring.length>1 && pbstring[0..2] == "//") {
+		if (pbstring.length>1 && pbstring.input[0..2] == "//") {
 			pbenum.comments ~= stripValidChars(CClass.Comment,pbstring);
 			pbstring = stripLWhite(pbstring);
 		}
@@ -68,11 +72,11 @@ struct PBEnum {
 		while(pbstring[0] != '}') {
 			if (pbstring.input.skipOver("option")) {
 				pbstring = stripLWhite(pbstring);
-				writeln("Ignoring option ",
+				writefln("Ignoring option %s",
 				ripOption(pbstring).name);
 				pbstring.input.skipOver(";");
 			}
-			else if (pbstring.length>1 && pbstring[0..2] == "//") {
+			else if (pbstring.length>1 && pbstring.input[0..2] == "//") {
 				// rip out the comment...
 				storeComment ~= stripValidChars(CClass.Comment,pbstring);
 				storeComment.line = pbstring.line;
@@ -80,19 +84,19 @@ struct PBEnum {
 				// start parsing, we shouldn't have any whitespace here
 				elementNum = pbenum.grabEnumValue(pbstring);
 				storeComment.lastElementLine = pbstring.line;
-				if(!storeComment.comments.empty) {
-					pbenum.valueComments[elementNum] = storeComment;
+				if(!storeComment.comments.empty()) {
+					pbenum.valueComments[elementNum] = storeComment.comments;
 					storeComment.comments = null;
 				}
 			}
 			if(storeComment.line == storeComment.lastElementLine) {
-				pbenum.valueComments[elementNum] = storeComment;
+				pbenum.valueComments[elementNum] = storeComment.comments;
 				storeComment.comments = null;
 			}
 			pbstring = stripLWhite(pbstring);
 		}
 		// rip off the }
-		pbstring = pbstring[1..$];
+		pbstring = pbstring[1..pbstring.length];
 		return pbenum;
 	}
 
@@ -119,7 +123,7 @@ struct PBEnum {
 		// now parse a numeric
 		string num = stripValidChars(CClass.Numeric,pbstring);
 		if (!num.length) throw new PBParseException("Enum Definition("~name~"."~tmp~")","Could not pull numeric enum value.", pbstring.line);
-		values[to!int(num)] = tmp;
+		values[to!(int)(num)] = tmp;
 		pbstring = stripLWhite(pbstring);
 		// deal with inline options
 		if (pbstring[0] == '[') {
@@ -129,10 +133,11 @@ struct PBEnum {
 		if (!pbstring.input.skipOver(";"))
 			throw new PBParseException("Enum Definition("~name~"."~tmp~"="~num~")","Expected ';'.", pbstring.line);
 
-		return to!int(num);
+		return to!(int)(num);
 	}
 }
 
+version(D_Version2)
 unittest {
 	writefln("unittest ProtocolBuffer.pbenum");
 	// the leading whitespace is assumed to already have been stripped
@@ -142,7 +147,7 @@ unittest {
     assert(edstring.match(regex(r"ALL = 3")).empty == false);
     assert(edstring.match(regex(r"JUNK = 5")).empty == false);
 
-	estring = "enum potato // With comment
+	estring = ParserData("enum potato // With comment
     {
         option allow_alias = true;
 	TOTALS = 1; // This is total
@@ -150,7 +155,7 @@ unittest {
 	// is all
 	JUNK= 5 ;
 	ALL =3;
-}";
+}");
 	auto enumValue = PBEnum(estring);
 	assert(enumValue.comments[0] == "// With comment");
 	assert(enumValue.valueComments[1][0] == "// This is total");
