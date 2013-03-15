@@ -7,8 +7,12 @@ import ProtocolBuffer.pbmessage;
 import ProtocolBuffer.pbenum;
 import ProtocolBuffer.pbextension;
 
-import std.algorithm;
-import std.range;
+version(D_Version2) {
+	import std.algorithm;
+	import std.range;
+} else
+	import ProtocolBuffer.pbhelper;
+
 import std.string;
 import std.stdio;
 
@@ -22,6 +26,17 @@ struct PBRoot {
 	string toDString(string indent="") {
 		string retstr = "";
 		retstr ~= "import ProtocolBuffer.pbhelper;\n";
+		version(D_Version2) {
+			retstr ~= "import std.conv;\n";
+			retstr ~= "string makeString(T)(T v) {\n";
+			retstr ~= "\treturn to!string(v);\n";
+			retstr ~= "}\n";
+		} else {
+			retstr ~= "import std.string;\n";
+			retstr ~= "string makeString(T)(T v) {\n";
+			retstr ~= "\treturn toString(v);\n";
+			retstr ~= "}\n";
+		}
 		// do what we need for extensions defined here
 		retstr ~= extensions.genExtString(indent);
 		// write out enums
@@ -37,16 +52,16 @@ struct PBRoot {
 
 	static PBRoot opCall(string input)
 	in {
-		assert(!input.empty);
+		assert(!input.empty());
 	} body {
 		PBRoot root;
-        auto pbstring = ParserData(input);
+		auto pbstring = ParserData(input);
 		// rip off whitespace before looking for the next definition
 		pbstring = stripLWhite(pbstring);
 		CommentManager storeComment;
 
 		// loop until the string is gone
-		while(!pbstring.input.empty) {
+		while(!pbstring.input.empty()) {
 			storeComment.lastElementType = typeNextElement(pbstring);
 			storeComment.lastElementLine = pbstring.line;
 			switch(storeComment.lastElementType){
@@ -65,19 +80,19 @@ struct PBRoot {
 			case PBTypes.PB_Comment:
 				// Preserve at least one spacing in comments
 				if(storeComment.line+1 < pbstring.line)
-					if(!storeComment.comments.empty)
+					if(!storeComment.comments.empty())
 						storeComment ~= "";
 				storeComment ~= stripValidChars(CClass.Comment,pbstring);
 				storeComment.line = pbstring.line;
 				break;
 			case PBTypes.PB_Option:
 				// rip of "option" and leading whitespace
-                pbstring.input.skipOver("option");
+				pbstring.input.skipOver("option");
 				pbstring = stripLWhite(pbstring);
 				ripOption(pbstring);
 				break;
 			case PBTypes.PB_Import:
-				pbstring = pbstring["import".length..$];
+				pbstring = pbstring["import".length..pbstring.length];
 				pbstring = stripLWhite(pbstring);
 				if (pbstring[0] != '"') throw new PBParseException("Root Definition("~root.Package~")","Imports must be quoted", pbstring.line);
 				// save imports for use by the compiler code
@@ -85,7 +100,7 @@ struct PBRoot {
 				// ensure that the ; is removed
 				pbstring = stripLWhite(pbstring);
 				if (pbstring[0] != ';') throw new PBParseException("Root Definition("~root.Package~")","Missing ; after import \""~root.imports[$-1]~"\"", pbstring.line);
-				pbstring = pbstring[1..$];
+				pbstring = pbstring[1..pbstring.length];
 				pbstring = stripLWhite(pbstring);
 				break;
 			default:
@@ -97,20 +112,23 @@ struct PBRoot {
 			pbstring = stripLWhite(pbstring);
 
 			// Attach Comments to elements
-			if(!storeComment.comments.empty) {
+			if(!storeComment.comments.empty()) {
 				if(storeComment.line == storeComment.lastElementLine
 				   || storeComment.line+3 > storeComment.lastElementLine) {
 					switch(storeComment.lastElementType) {
 						case PBTypes.PB_Comment:
 							break;
 						case PBTypes.PB_Message:
-							root.message_defs.back.comments = storeComment;
+							root.message_defs[$-1].comments
+								= storeComment.comments;
 							goto default;
 						case PBTypes.PB_Enum:
-							root.enum_defs.back.comments = storeComment;
+							root.enum_defs[$-1].comments
+								= storeComment.comments;
 							goto default;
 						case PBTypes.PB_Package:
-							root.comments = storeComment;
+							root.comments
+								= storeComment.comments;
 							goto default;
 						default:
 							storeComment.comments = null;
@@ -125,7 +143,7 @@ struct PBRoot {
 	in {
 		assert(pbstring.length);
 	} body {
-		pbstring = pbstring["package".length..$];
+		pbstring = pbstring["package".length..pbstring.length];
 		// strip any whitespace before the package name
 		pbstring = stripLWhite(pbstring);
 		// the next part of the string should be the package name up until the semicolon
@@ -137,7 +155,7 @@ struct PBRoot {
 			throw new PBParseException("Package Definition","Whitespace is not allowed in package names.", pbstring.line);
 		}
 		// actually rip off the ;
-		pbstring = pbstring[1..$];
+		pbstring = pbstring[1..pbstring.length];
 		// make sure this is valid
 		if (!validateMultiIdentifier(Package)) throw new PBParseException("Package Identifier("~Package~")","Package identifier did not validate.", pbstring.line);
 		return Package;
@@ -162,20 +180,20 @@ package myfirstpackage;
 
 	message PhoneNumber {
 	required string number = 1;
-	//woah, comments in a sub-definition  
+	//woah, comments in a sub-definition
 	optional PhoneType type = 2 ;
 	}
 
 	repeated PhoneNumber phone = 4;
 }
-//especially here    
+//especially here
 ";
 
 	writefln("unittest ProtocolBuffer.pbroot");
 	auto root = PBRoot(pbstr);
-    assert(root.Package == "myfirstpackage");
-    assert(root.message_defs[0].name == "Person");
-    assert(root.message_defs[0].comments.length == 1);
-    assert(root.message_defs[0].message_defs[0].name == "PhoneNumber");
-    assert(root.message_defs[0].enum_defs[0].name == "PhoneType");
+	assert(root.Package == "myfirstpackage");
+	assert(root.message_defs[0].name == "Person");
+	assert(root.message_defs[0].comments.length == 1);
+	assert(root.message_defs[0].message_defs[0].name == "PhoneNumber");
+	assert(root.message_defs[0].enum_defs[0].name == "PhoneType");
 }

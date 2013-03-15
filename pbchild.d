@@ -4,7 +4,9 @@
 module ProtocolBuffer.pbchild;
 import ProtocolBuffer.pbgeneral;
 
-import std.range;
+version(D_Version2) import std.range;
+else import ProtocolBuffer.pbhelper;
+
 import std.string;
 import std.stdio;
 import std.conv;
@@ -24,15 +26,15 @@ struct PBChild {
 		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]_":" _")~name~(valdefault.length?" = "~valdefault:"")~";\n";
 
 		foreach(c; comments)
-			ret ~= indent ~ (c.empty ? "":"/") ~ c ~ "\n";
-		if(comments.empty)
+			ret ~= indent ~ (c.empty() ? "":"/") ~ c ~ "\n";
+		if(comments.empty())
 			ret ~= indent ~ "///\n";
 		// get accessor
 		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~name~"() {\n";
 		ret ~= indent~"	return _"~name~";\n";
 		ret ~= indent~"}\n";
 
-		if(!comments.empty)
+		if(!comments.empty())
 			ret ~= indent ~ "/// ditto\n";
 		else
 			ret ~= indent ~ "///\n";
@@ -77,39 +79,39 @@ struct PBChild {
 		string ret;
 		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~"__exten_"~name~(valdefault.length?" = "~valdefault:"")~";\n";
 		// get accessor
-		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~"GetExtension(int T:"~to!string(index)~")() {\n";
+		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~"GetExtension(int T:"~to!(string)(index)~")() {\n";
 		ret ~= indent~"	return __exten_"~name~";\n";
 		ret ~= indent~"}\n";
 		// set accessor
-		ret ~= indent~(is_dep?"deprecated ":"")~"void SetExtension(int T:"~to!string(index)~")("~toDType(type)~(modifier=="repeated"?"[]":" ")~"input_var) {\n";
+		ret ~= indent~(is_dep?"deprecated ":"")~"void SetExtension(int T:"~to!(string)(index)~")("~toDType(type)~(modifier=="repeated"?"[]":" ")~"input_var) {\n";
 		ret ~= indent~"	__exten_"~name~" = input_var;\n";
 		if (modifier != "repeated") ret ~= indent~"	_has__exten_"~name~" = true;\n";
 		ret ~= indent~"}\n";
 		if (modifier == "repeated") {
-			ret ~= indent~(is_dep?"deprecated ":"")~"bool HasExtension(int T:"~to!string(index)~")() {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"bool HasExtension(int T:"~to!(string)(index)~")() {\n";
 			ret ~= indent~"	return __exten_"~name~".length?1:0;\n";
 			ret ~= indent~"}\n";
-			ret ~= indent~(is_dep?"deprecated ":"")~"void ClearExtension(int T:"~to!string(index)~")() {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"void ClearExtension(int T:"~to!(string)(index)~")() {\n";
 			ret ~= indent~"	__exten_"~name~" = null;\n";
 			ret ~= indent~"}\n";
 			// technically, they can just do class.item.length
 			// there is no need for this
-			ret ~= indent~(is_dep?"deprecated ":"")~"int ExtensionSize(int T:"~to!string(index)~")() {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"int ExtensionSize(int T:"~to!(string)(index)~")() {\n";
 			ret ~= indent~"	return __exten_"~name~".length;\n";
 			ret ~= indent~"}\n";
 			// functions to do additions, both singular and array
-			ret ~= indent~(is_dep?"deprecated ":"")~"void AddExtension(int T:"~to!string(index)~")("~toDType(type)~" __addme) {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"void AddExtension(int T:"~to!(string)(index)~")("~toDType(type)~" __addme) {\n";
 			ret ~= indent~"	__exten_"~name~" ~= __addme;\n";
 			ret ~= indent~"}\n";
-			ret ~= indent~(is_dep?"deprecated ":"")~"void AddExtension(int T:"~to!string(index)~")("~toDType(type)~"[]__addme) {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"void AddExtension(int T:"~to!(string)(index)~")("~toDType(type)~"[]__addme) {\n";
 			ret ~= indent~"	__exten_"~name~" ~= __addme;\n";
 			ret ~= indent~"}\n";
 		} else {
 			ret ~= indent~"bool _has__exten_"~name~" = false;\n";
-			ret ~= indent~(is_dep?"deprecated ":"")~"bool HasExtension(int T:"~to!string(index)~")() {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"bool HasExtension(int T:"~to!(string)(index)~")() {\n";
 			ret ~= indent~"	return _has__exten_"~name~";\n";
 			ret ~= indent~"}\n";
-			ret ~= indent~(is_dep?"deprecated ":"")~"void ClearExtension(int T:"~to!string(index)~")() {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"void ClearExtension(int T:"~to!(string)(index)~")() {\n";
 			ret ~= indent~"	_has__exten_"~name~" = false;\n";
 			ret ~= indent~"}\n";
 		}
@@ -123,8 +125,8 @@ struct PBChild {
 		PBChild child;
 		// all of the modifiers happen to be the same length...whodathunkit
 		// also, it's guaranteed to be there by previous code, so it shouldn't need error checking
-		child.modifier = pbstring[0..8];
-		pbstring = pbstring[8..$];
+		child.modifier = pbstring.input[0..8];
+		pbstring = pbstring[8..pbstring.length];
 		pbstring = stripLWhite(pbstring);
 		// now we want to pull out the type
 		child.type = stripValidChars(CClass.MultiIdentifier,pbstring);
@@ -138,12 +140,12 @@ struct PBChild {
 		pbstring = stripLWhite(pbstring);
 		// make sure the next character is =, because we need to snag the index, next
 		if (pbstring[0] != '=') throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Missing '=' for child instantiation.", pbstring.line);
-		pbstring = pbstring[1..$];
+		pbstring = pbstring[1..pbstring.length];
 		pbstring = stripLWhite(pbstring);
 		// pull numeric index
 		string tmp = stripValidChars(CClass.Numeric,pbstring);
 		if (!tmp.length) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Could not pull numeric index.", pbstring.line);
-		child.index = to!int(tmp);
+		child.index = to!(int)(tmp);
 		if (child.index <= 0) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Numeric index can not be less than 1.", pbstring.line);
 		if (child.index > (1<<29)-1) throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","Numeric index can not be greater than (1<<29)-1.", pbstring.line);
 		// deal with inline options
@@ -167,7 +169,7 @@ struct PBChild {
 		pbstring = stripLWhite(pbstring);
 		if (pbstring[0] == ';') {
 			// rip off the semicolon
-			pbstring = pbstring[1..$];
+			pbstring = pbstring[1..pbstring.length];
 			return child;
 		}
 		throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","No idea what to do with string after index and options.", pbstring.line);
@@ -211,7 +213,7 @@ struct PBChild {
 				ret ~= indent~"foreach(iter;"~name~") {\n";
 				indent ~= "	";
 			}
-			ret ~= indent~"	ret ~= "~(packed?"iter":tname)~".Serialize("~to!string(index)~");\n";
+			ret ~= indent~"	ret ~= "~(packed?"iter":tname)~".Serialize("~to!(string)(index)~");\n";
 			if (modifier == "repeated" && packed) {
 				indent = indent[0..$-1];
 				ret ~= indent~"}\n";
@@ -230,7 +232,7 @@ struct PBChild {
 			ret ~= "ret ~= "~func;
 		}
 		// finish off the parameters, because they're the same for packed or not
-		ret ~= "("~tname~","~to!string(index)~");\n";
+		ret ~= "("~tname~","~to!(string)(index)~");\n";
 		if (func == "toVarint!(int)") {
 			indent = indent[0..$-1];
 			ret ~= indent~"}\n";
@@ -247,11 +249,11 @@ struct PBChild {
 		string tname = "_"~name;
 		if (is_exten) tname = "__exten"~tname;
 		// check header ubyte with case since we're guaranteed to be in a switch
-		ret ~= indent~"case "~to!string(index)~":\n";
+		ret ~= indent~"case "~to!(string)(index)~":\n";
 		indent ~= "	";
 		// check the header vs the type
 		string pack;
-		ret ~= indent~"if (getWireType(header) == "~to!string(wTFromType(type))~") {\n";
+		ret ~= indent~"if (getWireType(header) == "~to!(string)(wTFromType(type))~") {\n";
 		indent ~= "	";
 		ret ~= indent~tname~" "~(modifier=="repeated"?"~":"")~"= ";
 		bool isobj = false;
@@ -276,7 +278,7 @@ struct PBChild {
 			// this covers enums and classen, since enums are declared as classes
 			// also, make sure we don't think we're root
 			isobj = true;
-			ret = indent[0..$-2]~"case "~to!string(index)~":\n";
+			ret = indent[0..$-2]~"case "~to!(string)(index)~":\n";
 			indent = indent[0..$-1];
 			ret ~= indent~"static if (is("~type~":Object)) {\n";
 			// no need to worry about packedness here, since it can't be
@@ -292,7 +294,7 @@ struct PBChild {
 			}
 			ret ~= indent~"	} else {\n";
 			// this is not condoned, wiretype is invalid, so explode!
-			ret ~= indent~"		throw new Exception(\"Invalid wiretype \"~std.conv.to!string(getWireType(header))~\" for variable type "~type~"\");\n";
+			ret ~= indent~"		throw new Exception(\"Invalid wiretype \"~makeString(getWireType(header))~\" for variable type "~type~"\");\n";
 			ret ~= indent~"	}\n";
 			ret ~= indent~"}\n";
 			break;
@@ -305,7 +307,7 @@ struct PBChild {
 			}
 			ret ~= indent~"} else {\n";
 			// this is not condoned, wiretype is invalid, so explode!
-			ret ~= indent~"	throw new Exception(\"Invalid wiretype \"~std.conv.to!string(getWireType(header))~\" for variable type "~type~"\");\n";
+			ret ~= indent~"	throw new Exception(\"Invalid wiretype \"~makeString(getWireType(header))~\" for variable type "~type~"\");\n";
 			ret ~= indent~"}\n";
 		}
 		// we need to modify this for both required and optional, repeated is taken care of
@@ -362,7 +364,7 @@ unittest {
 	assert(child.index == 1);
 	debug writefln("Checking output...");
 	debug writefln("%s",child.toDString("	"));
-	childtxt =
+	childtxt = ParserData(
 "	int _i32test = 5;
 	///
 	int i32test() {
@@ -380,8 +382,8 @@ unittest {
 	void clear_i32test () {
 		_has_i32test = false;
 	}
-";
-	assert(child.toDString("\t") == childtxt);
+");
+	assert(child.toDString("\t") == childtxt.input);
 	debug writefln("");
 }
 
