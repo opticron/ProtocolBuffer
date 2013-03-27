@@ -25,22 +25,28 @@ struct PBRoot {
 	string Package;
 	string[] comments;
 	PBExtension[]extensions;
-	string toDString(string indent="") {
+	string toDString() {
+		return langD1();
+	}
+	string langD1() {
 		string retstr = "";
 		retstr ~= "import ProtocolBuffer.pbhelper;\n";
-		version(D_Version2) {
-			retstr ~= "import std.conv;\n";
-			retstr ~= "string makeString(T)(T v) {\n";
-			retstr ~= "\treturn to!string(v);\n";
-			retstr ~= "}\n";
-		} else {
-			retstr ~= "import std.string;\n";
-			retstr ~= "string makeString(T)(T v) {\n";
-			retstr ~= "\treturn toString(v);\n";
-			retstr ~= "}\n";
-		}
+		retstr ~= "import std.string;\n\n";
+
+		retstr ~= "version(D_Version2) {\n";
+			retstr ~= "\timport std.conv;\n";
+			retstr ~= "\tstring makeString(T)(T v) {\n";
+			retstr ~= "\t\treturn to!(string)(v);\n";
+			retstr ~= "\t}\n";
+		retstr ~= "} else {\n";
+			retstr ~= "\timport std.string;\n";
+			retstr ~= "\tstring makeString(T)(T v) {\n";
+			retstr ~= "\t\treturn toString(v);\n";
+			retstr ~= "\t}\n";
+		retstr ~= "}\n";
+
 		// do what we need for extensions defined here
-		retstr ~= extensions.genExtString(indent);
+		retstr ~= extensions.genExtString("");
 		// write out enums
 		foreach(pbenum;enum_defs) {
 			retstr ~= toD1(pbenum, 0);
@@ -48,6 +54,28 @@ struct PBRoot {
 		// write out message definitions
 		foreach(pbmsg;message_defs) {
 			retstr ~= toD1(pbmsg, 0);
+		}
+		return retstr;
+    }
+	string langD() {
+		string retstr = "";
+		retstr ~= "import ProtocolBuffer.pbhelper;\n";
+		retstr ~= "import std.conv;\n";
+		retstr ~= "import std.typecons;\n\n";
+
+		retstr ~= "string makeString(T)(T v) {\n";
+		retstr ~= "\treturn to!string(v);\n";
+		retstr ~= "}\n";
+
+		// do what we need for extensions defined here
+		retstr ~= extensions.genExtString("");
+		// write out enums
+		foreach(pbenum;enum_defs) {
+			retstr ~= toD(pbenum, 0);
+		}
+		// write out message definitions
+		foreach(pbmsg;message_defs) {
+			retstr ~= toD(pbmsg, 0);
 		}
 		return retstr;
 	}
