@@ -1,8 +1,8 @@
 /**
  * This module provides conversion functionality of different elements
- * to the D Programming Language.
+ * to the D Programming Language which are campatible with version 1.
  */
-module ProtocolBuffer.conversion.dlang;
+module ProtocolBuffer.conversion.d1lang;
 
 import ProtocolBuffer.pbgeneral;
 import ProtocolBuffer.pbchild;
@@ -24,30 +24,66 @@ import std.string : format;
  */
 private string typeWrapper(PBChild child) {
 	if(child.modifier == "repeated")
-		return format("Nullable!(%s[])", toDType(child.type));
+		return format("%s[]", toDType(child.type));
 	else
-		return format("Nullable!(%s)", toDType(child.type));
+		return format("%s", toDType(child.type));
 }
 
 /**
  */
-string toD(PBChild child, int indentCount = 0) {
+string toD1(PBChild child, int indentCount = 0) {
 	string ret;
 	auto indent = indented(indentCount);
 	with(child) {
-		// Apply comments to field
+		ret ~= indent~toDType(type)~(modifier=="repeated"?"[]_":" _")~name~(valdefault.length?" = "~valdefault:"")~";\n";
+
 		foreach(c; comments)
 			ret ~= indent ~ (c.empty ? "":"/") ~ c ~ "\n";
 		if(comments.empty)
 			ret ~= indent ~ "///\n";
+		// get accessor
+		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~name~"() {\n";
+		ret ~= indent~"	return _"~name~";\n";
+		ret ~= indent~"}\n";
 
-		// Make field declaration
-		ret ~= indent ~ (is_dep ? "deprecated " : "");
-		ret ~= child.typeWrapper;
-		ret ~= " " ~ name;
-		if(!valdefault.empty) // Apply default value
-			ret ~= " = " ~ valdefault;
-		ret ~= ";";
+		if(!comments.empty)
+			ret ~= indent ~ "/// ditto\n";
+		else
+			ret ~= indent ~ "///\n";
+		// set accessor
+		ret ~= indent~(is_dep?"deprecated ":"")~"void "~name~"("~toDType(type)~(modifier=="repeated"?"[]":" ")~"input_var) {\n";
+		ret ~= indent~"	_"~name~" = input_var;\n";
+
+		if (modifier != "repeated") ret ~= indent~"	_has_"~name~" = true;\n";
+		ret ~= indent~"}\n";
+		if (modifier == "repeated") {
+			ret ~= indent~(is_dep?"deprecated ":"")~"bool has_"~name~" () {\n";
+			ret ~= indent~"	return _"~name~".length?1:0;\n";
+			ret ~= indent~"}\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"void clear_"~name~" () {\n";
+			ret ~= indent~"	_"~name~" = null;\n";
+			ret ~= indent~"}\n";
+			// technically, they can just do class.item.length
+			// there is no need for this
+			ret ~= indent~(is_dep?"deprecated ":"")~"int "~name~"_size () {\n";
+			ret ~= indent~"	return _"~name~".length;\n";
+			ret ~= indent~"}\n";
+			// functions to do additions, both singular and array
+			ret ~= indent~(is_dep?"deprecated ":"")~"void add_"~name~" ("~toDType(type)~" __addme) {\n";
+			ret ~= indent~"	_"~name~" ~= __addme;\n";
+			ret ~= indent~"}\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"void add_"~name~" ("~toDType(type)~"[]__addme) {\n";
+			ret ~= indent~"	_"~name~" ~= __addme;\n";
+			ret ~= indent~"}\n";
+		} else {
+			ret ~= indent~"bool _has_"~name~" = false;\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"bool has_"~name~" () {\n";
+			ret ~= indent~"	return _has_"~name~";\n";
+			ret ~= indent~"}\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"void clear_"~name~" () {\n";
+			ret ~= indent~"	_has_"~name~" = false;\n";
+			ret ~= indent~"}\n";
+		}
 	}
 	return ret;
 }
@@ -58,39 +94,41 @@ unittest {
 	// Conversion for optional
 	auto str = ParserData("optional HeaderBBox bbox = 1;");
 	child = PBChild(str);
-	auto ans = "///\nNullable!(HeaderBBox) bbox;";
-	assert(child.toD() == ans);
+    assert(!child.toD1().find(r"bbox(HeaderBBox").empty);
+    assert(!child.toD1().find(r"bbox()").empty);
+    assert(!child.toD1().find(r"has_bbox").empty);
+    assert(!child.toD1().find(r"clear_bbox").empty);
 
 	// Conversion for repeated
 	str = ParserData("repeated HeaderBBox bbox = 1;");
 	child = PBChild(str);
-	ans = "///\nNullable!(HeaderBBox[]) bbox;";
-	assert(child.toD() == ans);
+    assert(!child.toD1().find(r"bbox(HeaderBBox[]").empty);
+    assert(!child.toD1().find(r"bbox()").empty);
+    assert(!child.toD1().find(r"has_bbox").empty);
+    assert(!child.toD1().find(r"clear_bbox").empty);
+    assert(!child.toD1().find(r"add_bbox").empty);
 
 	// Conversion for required
 	str = ParserData("required int32 value = 1;");
 	child = PBChild(str);
-	ans = "///\nNullable!(int) value;";
-	assert(child.toD() == ans);
 
 	// Conversion for default value
 	str = ParserData("required int64 value = 1 [default=6]; ");
 	child = PBChild(str);
-	ans = "///\nNullable!(long) value = 6;";
-	assert(child.toD() == ans);
+    assert(child.toD1().startsWith(r"long _value = 6;"));
 
 	// Conversion for default, negative, deprecated value
 	str = ParserData("optional int64 value = 1 [default=-32,deprecated=true];");
 	child = PBChild(str);
-	ans = "///\ndeprecated Nullable!(long) value = -32;";
-	assert(child.toD() == ans);
+    assert(child.toD1().startsWith(r"long _value = -32;"));
+    assert(!child.toD1().find(r"deprecated long value()").empty);
 
 	// Conversion for commented, indented
 	str = ParserData("optional HeaderBBox bbox = 1;");
 	child = PBChild(str);
 	child.comments ~= "// This is a comment";
-	ans = "\t/// This is a comment\n\tNullable!(HeaderBBox) bbox;";
-	assert(child.toD(1) == ans);
+    assert(!child.toD1().find(r"/// This is a comment").empty);
+    assert(!child.toD1().find(r"/// ditto").empty);
 }
 
 string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
@@ -223,7 +261,7 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			ret ~= "ret ~= toPacked!("~toDType(type)~","~func~")";
 		} else {
 			if (modifier != "repeated" && modifier != "required")
-				ret ~= "if (!"~tname~".isNull) ";
+				ret ~= "if (_has_"~tname~") ";
 			ret ~= "ret ~= "~func;
 		}
 		// finish off the parameters, because they're the same for packed or not
@@ -242,7 +280,7 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 
 /**
  */
-string toD(PBEnum child, int indentCount = 0) {
+string toD1(PBEnum child, int indentCount = 0) {
 	auto indent = indented(indentCount);
 	string ret = "";
 	with(child) {
@@ -271,10 +309,10 @@ unittest {
 r"\t\w{3,6} = \d,\n" ~
 r"\t\w{3,6} = \d,\n" ~
 r"\t\w{3,6} = \d,\n\}");
-    assert(!enm.toD.match(ans).empty);
-    assert(!enm.toD.find(r"TOTALS = 1").empty);
-    assert(!enm.toD.find(r"ALL = 3").empty);
-    assert(!enm.toD.find(r"JUNK = 5").empty);
+    assert(!enm.toD1.match(ans).empty);
+    assert(!enm.toD1.find(r"TOTALS = 1").empty);
+    assert(!enm.toD1.find(r"ALL = 3").empty);
+    assert(!enm.toD1.find(r"JUNK = 5").empty);
 
 	// Conversion for commented, indented
 	str = ParserData("enum potato {\n// The total\nTOTALS = 1;}");
@@ -285,7 +323,7 @@ r"\tenum potato \{\n" ~
 r"\t\t/// The total\n" ~
 r"\t\tTOTALS = \d,\n" ~
 r"\t\}");
-    assert(!enm.toD(1).match(ans).empty);
+    assert(!enm.toD1(1).match(ans).empty);
 }
 
 string genDes(PBMessage msg, int indentCount = 0) {
@@ -335,7 +373,7 @@ string genDes(PBMessage msg, int indentCount = 0) {
 			ret ~= indent~"if (_has__exten_"~pbchild.name~" == false) throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n";
 		}
 		foreach(pbchild;children) if (pbchild.modifier == "required") {
-			ret ~= indent~"if ("~pbchild.name~".isNull) throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n";
+			ret ~= indent~"if (!_has_"~pbchild.name~") throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n";
 		}
 		indent = indented(--indentCount);
 		ret ~= indent~"}\n";
@@ -383,9 +421,9 @@ string genMerge(PBMessage msg, int indentCount = 0) {
 		indent = indented(++indentCount);
 		// merge code
 		foreach(pbchild;children) if (pbchild.modifier != "repeated") {
-			ret ~= indent~"if (!merger."~pbchild.name~".isNull) "~pbchild.name~" = merger."~pbchild.name~";\n";
+			ret ~= indent~"if (merger._has_"~pbchild.name~") "~pbchild.name~" = merger."~pbchild.name~";\n";
 		} else {
-			ret ~= indent~"if (!merger."~pbchild.name~".isNull) add_"~pbchild.name~"(merger."~pbchild.name~");\n";
+			ret ~= indent~"if (merger._has_"~pbchild.name~") add_"~pbchild.name~"(merger."~pbchild.name~");\n";
 		}
 		indent = indented(--indentCount);
 		ret ~= indent~"}\n";
@@ -395,7 +433,7 @@ string genMerge(PBMessage msg, int indentCount = 0) {
 
 /**
  */
-string toD(PBMessage msg, int indentCount = 0) {
+string toD1(PBMessage msg, int indentCount = 0) {
 	auto indent = indented(indentCount);
 	string ret = "";
 	with(msg) {
@@ -408,17 +446,17 @@ string toD(PBMessage msg, int indentCount = 0) {
 		// fill the class with goodies!
 		// first, we'll do the enums!
 		foreach(pbenum;enum_defs) {
-			ret ~= pbenum.toD(indentCount);
+			ret ~= pbenum.toD1(indentCount);
 			ret ~= "\n\n";
 		}
 		// now, we'll do the nested messages
 		foreach(pbmsg;message_defs) {
-			ret ~= pbmsg.toD(indentCount);
+			ret ~= pbmsg.toD1(indentCount);
 			ret ~= "\n\n";
 		}
 		// do the individual instantiations
 		foreach(pbchild;children) {
-			ret ~= pbchild.toD(indentCount);
+			ret ~= pbchild.toD1(indentCount);
 			ret ~= "\n";
 		}
 		// last, do the extension instantiations
@@ -459,9 +497,10 @@ unittest {
 	enum msg = PBCompileTime(str);
 	import ProtocolBuffer.pbhelper;
 	import std.typecons;
-	mixin("static " ~ msg.toD);
+	mixin("static " ~ msg.toD1);
 	ubyte[] feed = [0x08,0x96,0x01]; // From example
 	auto t1 = Test1(feed);
 	assert(t1.a == 150);
 	assert(t1.Serialize() == feed);
 }
+

@@ -7,6 +7,7 @@ import ProtocolBuffer.pbmessage;
 import ProtocolBuffer.pbenum;
 import ProtocolBuffer.pbextension;
 import ProtocolBuffer.conversion.dlang;
+import ProtocolBuffer.conversion.d1lang;
 
 version(D_Version2) {
 	import std.algorithm;
@@ -42,11 +43,11 @@ struct PBRoot {
 		retstr ~= extensions.genExtString(indent);
 		// write out enums
 		foreach(pbenum;enum_defs) {
-			retstr ~= pbenum.toD(0);
+			retstr ~= pbenum.toD1(0);
 		}
 		// write out message definitions
 		foreach(pbmsg;message_defs) {
-			retstr ~= pbmsg.toD(0);
+			retstr ~= pbmsg.toD1(0);
 		}
 		return retstr;
 	}
