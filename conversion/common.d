@@ -13,7 +13,7 @@ version(D_Version2) {
 }
 
 /*
- * Converts a numeric to an intent string
+ * Converts a numeric to an indent string
  */
 string indented(int indentCount) {
 	version(D_Version2)
