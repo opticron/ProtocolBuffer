@@ -20,23 +20,6 @@ struct PBEnum {
 	string[] comments;
 	string[][int] valueComments;
 	string[int] values;
-	string toDString(string indent) {
-		string retstr = "";
-		foreach(c; comments) {
-			retstr ~= indent ~ (c.empty() ? "":"/") ~ c ~ "\n";
-		}
-		retstr ~= indent~"enum "~name~" {\n";
-		foreach (key,value;values) {
-			if(key in valueComments)
-				foreach(c; valueComments[key])
-					retstr ~= indent ~ "/" ~ c ~ "\n";
-
-			retstr ~= indent~"\t"~value~" = "~to!(string)(key)~",\n";
-
-		}
-		retstr ~= indent~"}\n";
-		return retstr;
-	}
 
 	// string-modifying constructor
 	static PBEnum opCall(ref ParserData pbstring)
@@ -136,30 +119,3 @@ struct PBEnum {
 		return to!(int)(num);
 	}
 }
-
-version(D_Version2)
-unittest {
-	writefln("unittest ProtocolBuffer.pbenum");
-	// the leading whitespace is assumed to already have been stripped
-	auto estring = ParserData("enum potato {TOTALS = 1;JUNK= 5 ; ALL =3;}");
-	auto edstring = PBEnum(estring).toDString("");
-    assert(edstring.match(regex(r"TOTALS = 1")).empty == false);
-    assert(edstring.match(regex(r"ALL = 3")).empty == false);
-    assert(edstring.match(regex(r"JUNK = 5")).empty == false);
-
-	estring = ParserData("enum potato // With comment
-    {
-        option allow_alias = true;
-	TOTALS = 1; // This is total
-	// Just junk
-	// is all
-	JUNK= 5 ;
-	ALL =3;
-}");
-	auto enumValue = PBEnum(estring);
-	assert(enumValue.comments[0] == "// With comment");
-	assert(enumValue.valueComments[1][0] == "// This is total");
-	assert(enumValue.valueComments[5][0] == "// Just junk");
-	assert(enumValue.valueComments[5][1] == "// is all");
-}
-
