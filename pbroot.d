@@ -43,11 +43,11 @@ struct PBRoot {
 		retstr ~= extensions.genExtString(indent);
 		// write out enums
 		foreach(pbenum;enum_defs) {
-			retstr ~= pbenum.toD1(0);
+			retstr ~= toD1(pbenum, 0);
 		}
 		// write out message definitions
 		foreach(pbmsg;message_defs) {
-			retstr ~= pbmsg.toD1(0);
+			retstr ~= toD1(pbmsg, 0);
 		}
 		return retstr;
 	}

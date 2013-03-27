@@ -10,10 +10,14 @@ import ProtocolBuffer.pbenum;
 import ProtocolBuffer.pbmessage;
 import ProtocolBuffer.conversion.common;
 
-import std.algorithm;
+version(D_Version2) {
+	import std.algorithm;
+	import std.range;
+	import std.regex;
+} else
+	import ProtocolBuffer.pbhelper;
+
 import std.conv;
-import std.range;
-import std.regex;
 import std.string : format;
 
 /*
@@ -37,15 +41,15 @@ string toD(PBChild child, int indentCount = 0) {
 	with(child) {
 		// Apply comments to field
 		foreach(c; comments)
-			ret ~= indent ~ (c.empty ? "":"/") ~ c ~ "\n";
-		if(comments.empty)
+			ret ~= indent ~ (c.empty() ? "":"/") ~ c ~ "\n";
+		if(comments.empty())
 			ret ~= indent ~ "///\n";
 
 		// Make field declaration
 		ret ~= indent ~ (is_dep ? "deprecated " : "");
-		ret ~= child.typeWrapper;
+		ret ~= typeWrapper(child);
 		ret ~= " " ~ name;
-		if(!valdefault.empty) // Apply default value
+		if(!empty(valdefault)) // Apply default value
 			ret ~= " = " ~ valdefault;
 		ret ~= ";";
 	}
@@ -58,39 +62,39 @@ unittest {
 	// Conversion for optional
 	auto str = ParserData("optional HeaderBBox bbox = 1;");
 	child = PBChild(str);
-	auto ans = "///\nNullable!(HeaderBBox) bbox;";
-	assert(child.toD() == ans);
+	string ans = "///\nNullable!(HeaderBBox) bbox;";
+	assert(toD(child) == ans);
 
 	// Conversion for repeated
 	str = ParserData("repeated HeaderBBox bbox = 1;");
 	child = PBChild(str);
 	ans = "///\nNullable!(HeaderBBox[]) bbox;";
-	assert(child.toD() == ans);
+	assert(toD(child) == ans);
 
 	// Conversion for required
 	str = ParserData("required int32 value = 1;");
 	child = PBChild(str);
 	ans = "///\nNullable!(int) value;";
-	assert(child.toD() == ans);
+	assert(toD(child) == ans);
 
 	// Conversion for default value
 	str = ParserData("required int64 value = 1 [default=6]; ");
 	child = PBChild(str);
 	ans = "///\nNullable!(long) value = 6;";
-	assert(child.toD() == ans);
+	assert(toD(child) == ans);
 
 	// Conversion for default, negative, deprecated value
 	str = ParserData("optional int64 value = 1 [default=-32,deprecated=true];");
 	child = PBChild(str);
 	ans = "///\ndeprecated Nullable!(long) value = -32;";
-	assert(child.toD() == ans);
+	assert(toD(child) == ans);
 
 	// Conversion for commented, indented
 	str = ParserData("optional HeaderBBox bbox = 1;");
 	child = PBChild(str);
 	child.comments ~= "// This is a comment";
 	ans = "\t/// This is a comment\n\tNullable!(HeaderBBox) bbox;";
-	assert(child.toD(1) == ans);
+	assert(toD(child, 1) == ans);
 }
 
 string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
@@ -100,11 +104,11 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 		string tname = name;
 		if (is_exten) tname = "__exten"~tname;
 		// check header ubyte with case since we're guaranteed to be in a switch
-		ret ~= indent~"case "~to!string(index)~":\n";
+		ret ~= indent~"case "~to!(string)(index)~":\n";
 		indent = indented(++indentCount);
 		// check the header vs the type
 		string pack;
-		ret ~= indent~"if (getWireType(header) == "~to!string(wTFromType(type))~") {\n";
+		ret ~= indent~"if (getWireType(header) == "~to!(string)(wTFromType(type))~") {\n";
 		indent = indented(++indentCount);
 		ret ~= indent~tname~" "~(modifier=="repeated"?"~":"")~"= ";
 		bool isobj = false;
@@ -130,7 +134,7 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 			// also, make sure we don't think we're root
 			isobj = true;
 			indent = indented(--indentCount);
-			ret = indented(indentCount-1)~"case "~to!string(index)~":\n";
+			ret = indented(indentCount-1)~"case "~to!(string)(index)~":\n";
 			ret ~= indent~"static if (is("~type~":Object)) {\n";
 			// no need to worry about packedness here, since it can't be
 			ret ~= indented(indentCount+1)~tname~" "~(modifier=="repeated"?"~":"")~"= "~type~".Deserialize(input,false);\n";
@@ -145,7 +149,7 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 			}
 			ret ~= indented(indentCount+1)~"} else {\n";
 			// this is not condoned, wiretype is invalid, so explode!
-			ret ~= indented(indentCount+2)~"throw new Exception(\"Invalid wiretype \"~std.conv.to!string(getWireType(header))~\" for variable type "~type~"\");\n";
+			ret ~= indented(indentCount+2)~"throw new Exception(\"Invalid wiretype \"~std.conv.to!(string)(getWireType(header))~\" for variable type "~type~"\");\n";
 			ret ~= indent~"	}\n";
 			ret ~= indent~"}\n";
 			break;
@@ -158,7 +162,7 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 			}
 			ret ~= indent~"} else {\n";
 			// this is not condoned, wiretype is invalid, so explode!
-			ret ~= indent~"	throw new Exception(\"Invalid wiretype \"~std.conv.to!string(getWireType(header))~\" for variable type "~type~"\");\n";
+			ret ~= indent~"	throw new Exception(\"Invalid wiretype \"~std.conv.to!(string)(getWireType(header))~\" for variable type "~type~"\");\n";
 			ret ~= indent~"}\n";
 		}
 		// tack on the break so we don't have fallthrough
@@ -207,7 +211,7 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 				ret ~= indent~"foreach(iter;"~name~") {\n";
 				indent = indented(++indentCount);
 			}
-			ret ~= indent~"	ret ~= "~(packed?"iter":tname)~".Serialize("~to!string(index)~");\n";
+			ret ~= indent~"	ret ~= "~(packed?"iter":tname)~".Serialize("~to!(string)(index)~");\n";
 			if (modifier == "repeated" && packed) {
 				indent = indented(--indentCount);
 				ret ~= indent~"}\n";
@@ -227,7 +231,7 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			ret ~= "ret ~= "~func;
 		}
 		// finish off the parameters, because they're the same for packed or not
-		ret ~= "("~tname~","~to!string(index)~");\n";
+		ret ~= "("~tname~","~to!(string)(index)~");\n";
 		if (func == "toVarint!(int)") {
 			indent = indented(--indentCount);
 			ret ~= indent~"}\n";
@@ -248,7 +252,7 @@ string toD(PBEnum child, int indentCount = 0) {
 	with(child) {
 		// Apply comments to enum
 		foreach(c; comments)
-			ret ~= indent ~ (c.empty ? "":"/") ~ c ~ "\n";
+			ret ~= indent ~ (c.empty()? "":"/") ~ c ~ "\n";
 
 		ret ~= indent~"enum "~name~" {\n";
 		foreach (key, value; values) {
@@ -257,13 +261,14 @@ string toD(PBEnum child, int indentCount = 0) {
 				foreach(c; valueComments[key])
 					ret ~= indent ~ "\t/" ~ c ~ "\n";
 
-			ret ~= indent~"\t"~value~" = "~to!string(key)~",\n";
+			ret ~= indent~"\t"~value~" = "~to!(string)(key)~",\n";
 		}
 		ret ~= indent~"}";
 	}
 	return ret;
 }
 
+version(D_Version2)
 unittest {
 	auto str = ParserData("enum potato {TOTALS = 1;JUNK= 5 ; ALL =3;}");
 	auto enm = PBEnum(str);
@@ -319,7 +324,7 @@ string genDes(PBMessage msg, int indentCount = 0) {
 			ret ~= genDes(pbchild, indentCount);
 		}
 		foreach(pbchild;child_exten) {
-			ret ~= pbchild.genDes(indentCount, true);
+			ret ~= genDes(pbchild, indentCount, true);
 		}
 		// take care of default case
 		ret ~= indent~"default:\n";
@@ -354,10 +359,10 @@ string genSer(PBMessage msg, int indentCount = 0) {
 		ret ~= indent~"ubyte[] ret;\n";
 		// serialization code goes here
 		foreach(pbchild;children) {
-			ret ~= pbchild.genSer(indentCount);
+			ret ~= genSer(pbchild, indentCount);
 		}
 		foreach(pbchild;child_exten) {
-			ret ~= pbchild.genSer(indentCount,true);
+			ret ~= genSer(pbchild, indentCount,true);
 		}
 		// tack on unknown bytes
 		ret ~= indent~"ret ~= ufields;\n";
@@ -400,7 +405,7 @@ string toD(PBMessage msg, int indentCount = 0) {
 	string ret = "";
 	with(msg) {
 		foreach(c; comments)
-			ret ~= indent ~ (c.empty ? "":"/") ~ c ~ "\n";
+			ret ~= indent ~ (c.empty() ? "":"/") ~ c ~ "\n";
 		ret ~= indent~(indent.length?"static ":"")~"struct "~name~" {\n";
 		indent = indented(++indentCount);
 		ret ~= indent~"// deal with unknown fields\n";
@@ -408,17 +413,17 @@ string toD(PBMessage msg, int indentCount = 0) {
 		// fill the class with goodies!
 		// first, we'll do the enums!
 		foreach(pbenum;enum_defs) {
-			ret ~= pbenum.toD(indentCount);
+			ret ~= toD(pbenum, indentCount);
 			ret ~= "\n\n";
 		}
 		// now, we'll do the nested messages
 		foreach(pbmsg;message_defs) {
-			ret ~= pbmsg.toD(indentCount);
+			ret ~= toD(pbmsg, indentCount);
 			ret ~= "\n\n";
 		}
 		// do the individual instantiations
 		foreach(pbchild;children) {
-			ret ~= pbchild.toD(indentCount);
+			ret ~= toD(pbchild, indentCount);
 			ret ~= "\n";
 		}
 		// last, do the extension instantiations
@@ -449,16 +454,17 @@ string toD(PBMessage msg, int indentCount = 0) {
 	return ret;
 }
 
+version(D_Version2)
 unittest {
     PBMessage PBCompileTime(ParserData pbstring) {
         return PBMessage(pbstring);
     }
 
 	// Conversion for optional
-	enum str = ParserData("message Test1 { required int32 a = 1; }");
-	enum msg = PBCompileTime(str);
-	import ProtocolBuffer.pbhelper;
-	import std.typecons;
+	mixin(`enum str = ParserData("message Test1 { required int32 a = 1; }");`);
+	mixin(`enum msg = PBCompileTime(str);`);
+	mixin(`import ProtocolBuffer.pbhelper;`);
+	mixin(`import std.typecons;`);
 	mixin("static " ~ msg.toD);
 	ubyte[] feed = [0x08,0x96,0x01]; // From example
 	auto t1 = Test1(feed);

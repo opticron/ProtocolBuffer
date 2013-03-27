@@ -10,10 +10,14 @@ import ProtocolBuffer.pbenum;
 import ProtocolBuffer.pbmessage;
 import ProtocolBuffer.conversion.common;
 
-import std.algorithm;
+version(D_Version2) {
+	import std.algorithm;
+	import std.range;
+	import std.regex;
+} else
+	import ProtocolBuffer.pbhelper;
+
 import std.conv;
-import std.range;
-import std.regex;
 import std.string : format;
 
 /*
@@ -38,15 +42,15 @@ string toD1(PBChild child, int indentCount = 0) {
 		ret ~= indent~toDType(type)~(modifier=="repeated"?"[]_":" _")~name~(valdefault.length?" = "~valdefault:"")~";\n";
 
 		foreach(c; comments)
-			ret ~= indent ~ (c.empty ? "":"/") ~ c ~ "\n";
-		if(comments.empty)
+			ret ~= indent ~ (c.empty() ? "":"/") ~ c ~ "\n";
+		if(comments.empty())
 			ret ~= indent ~ "///\n";
 		// get accessor
 		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~name~"() {\n";
 		ret ~= indent~"	return _"~name~";\n";
 		ret ~= indent~"}\n";
 
-		if(!comments.empty)
+		if(!comments.empty())
 			ret ~= indent ~ "/// ditto\n";
 		else
 			ret ~= indent ~ "///\n";
@@ -84,10 +88,11 @@ string toD1(PBChild child, int indentCount = 0) {
 			ret ~= indent~"	_has_"~name~" = false;\n";
 			ret ~= indent~"}\n";
 		}
-	}
-	return ret;
+		return ret;
+    }
 }
 
+version(D_Version2)
 unittest {
 	PBChild child;
 
@@ -138,11 +143,11 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 		string tname = name;
 		if (is_exten) tname = "__exten"~tname;
 		// check header ubyte with case since we're guaranteed to be in a switch
-		ret ~= indent~"case "~to!string(index)~":\n";
+		ret ~= indent~"case "~to!(string)(index)~":\n";
 		indent = indented(++indentCount);
 		// check the header vs the type
 		string pack;
-		ret ~= indent~"if (getWireType(header) == "~to!string(wTFromType(type))~") {\n";
+		ret ~= indent~"if (getWireType(header) == "~to!(string)(wTFromType(type))~") {\n";
 		indent = indented(++indentCount);
 		ret ~= indent~tname~" "~(modifier=="repeated"?"~":"")~"= ";
 		bool isobj = false;
@@ -168,7 +173,7 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 			// also, make sure we don't think we're root
 			isobj = true;
 			indent = indented(--indentCount);
-			ret = indented(indentCount-1)~"case "~to!string(index)~":\n";
+			ret = indented(indentCount-1)~"case "~to!(string)(index)~":\n";
 			ret ~= indent~"static if (is("~type~":Object)) {\n";
 			// no need to worry about packedness here, since it can't be
 			ret ~= indented(indentCount+1)~tname~" "~(modifier=="repeated"?"~":"")~"= "~type~".Deserialize(input,false);\n";
@@ -183,7 +188,7 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 			}
 			ret ~= indented(indentCount+1)~"} else {\n";
 			// this is not condoned, wiretype is invalid, so explode!
-			ret ~= indented(indentCount+2)~"throw new Exception(\"Invalid wiretype \"~std.conv.to!string(getWireType(header))~\" for variable type "~type~"\");\n";
+			ret ~= indented(indentCount+2)~"throw new Exception(\"Invalid wiretype \"~makeString(getWireType(header))~\" for variable type "~type~"\");\n";
 			ret ~= indent~"	}\n";
 			ret ~= indent~"}\n";
 			break;
@@ -196,7 +201,7 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 			}
 			ret ~= indent~"} else {\n";
 			// this is not condoned, wiretype is invalid, so explode!
-			ret ~= indent~"	throw new Exception(\"Invalid wiretype \"~std.conv.to!string(getWireType(header))~\" for variable type "~type~"\");\n";
+			ret ~= indent~"	throw new Exception(\"Invalid wiretype \"~makeString(getWireType(header))~\" for variable type "~type~"\");\n";
 			ret ~= indent~"}\n";
 		}
 		// tack on the break so we don't have fallthrough
@@ -245,7 +250,7 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 				ret ~= indent~"foreach(iter;"~name~") {\n";
 				indent = indented(++indentCount);
 			}
-			ret ~= indent~"	ret ~= "~(packed?"iter":tname)~".Serialize("~to!string(index)~");\n";
+			ret ~= indent~"	ret ~= "~(packed?"iter":tname)~".Serialize("~to!(string)(index)~");\n";
 			if (modifier == "repeated" && packed) {
 				indent = indented(--indentCount);
 				ret ~= indent~"}\n";
@@ -265,7 +270,7 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			ret ~= "ret ~= "~func;
 		}
 		// finish off the parameters, because they're the same for packed or not
-		ret ~= "("~tname~","~to!string(index)~");\n";
+		ret ~= "("~tname~","~to!(string)(index)~");\n";
 		if (func == "toVarint!(int)") {
 			indent = indented(--indentCount);
 			ret ~= indent~"}\n";
@@ -286,7 +291,7 @@ string toD1(PBEnum child, int indentCount = 0) {
 	with(child) {
 		// Apply comments to enum
 		foreach(c; comments)
-			ret ~= indent ~ (c.empty ? "":"/") ~ c ~ "\n";
+			ret ~= indent ~ (c.empty() ? "":"/") ~ c ~ "\n";
 
 		ret ~= indent~"enum "~name~" {\n";
 		foreach (key, value; values) {
@@ -295,13 +300,14 @@ string toD1(PBEnum child, int indentCount = 0) {
 				foreach(c; valueComments[key])
 					ret ~= indent ~ "\t/" ~ c ~ "\n";
 
-			ret ~= indent~"\t"~value~" = "~to!string(key)~",\n";
+			ret ~= indent~"\t"~value~" = "~to!(string)(key)~",\n";
 		}
 		ret ~= indent~"}";
 	}
 	return ret;
 }
 
+version(D_Version2)
 unittest {
 	auto str = ParserData("enum potato {TOTALS = 1;JUNK= 5 ; ALL =3;}");
 	auto enm = PBEnum(str);
@@ -333,7 +339,8 @@ string genDes(PBMessage msg, int indentCount = 0) {
 		// add comments
 		ret ~= indent~"// if we're root, we can assume we own the whole string\n";
 		ret ~= indent~"// if not, the first thing we need to do is pull the length that belongs to us\n";
-		ret ~= indent~"static "~name~" Deserialize(ref ubyte[] manip, bool isroot=true) {return "~name~"(manip,isroot);}\n";
+		ret ~= indent~"static "~name~" Deserialize(ref ubyte[] manip, bool isroot=true) {return new "~name~"(manip,isroot);}\n";
+		ret ~= indent~"this() { }\n";
 		ret ~= indent~"this(ref ubyte[] manip,bool isroot=true) {\n";
 		indent = indented(++indentCount);
 		ret ~= indent~"ubyte[] input = manip;\n";
@@ -357,7 +364,7 @@ string genDes(PBMessage msg, int indentCount = 0) {
 			ret ~= genDes(pbchild, indentCount);
 		}
 		foreach(pbchild;child_exten) {
-			ret ~= pbchild.genDes(indentCount, true);
+			ret ~= genDes(pbchild, indentCount, true);
 		}
 		// take care of default case
 		ret ~= indent~"default:\n";
@@ -392,10 +399,10 @@ string genSer(PBMessage msg, int indentCount = 0) {
 		ret ~= indent~"ubyte[] ret;\n";
 		// serialization code goes here
 		foreach(pbchild;children) {
-			ret ~= pbchild.genSer(indentCount);
+			ret ~= genSer(pbchild, indentCount);
 		}
 		foreach(pbchild;child_exten) {
-			ret ~= pbchild.genSer(indentCount,true);
+			ret ~= genSer(pbchild, indentCount,true);
 		}
 		// tack on unknown bytes
 		ret ~= indent~"ret ~= ufields;\n";
@@ -438,25 +445,25 @@ string toD1(PBMessage msg, int indentCount = 0) {
 	string ret = "";
 	with(msg) {
 		foreach(c; comments)
-			ret ~= indent ~ (c.empty ? "":"/") ~ c ~ "\n";
-		ret ~= indent~(indent.length?"static ":"")~"struct "~name~" {\n";
+			ret ~= indent ~ (c.empty() ? "":"/") ~ c ~ "\n";
+		ret ~= indent~(indent.length?"static ":"")~"class "~name~" {\n";
 		indent = indented(++indentCount);
 		ret ~= indent~"// deal with unknown fields\n";
 		ret ~= indent~"ubyte[] ufields;\n";
 		// fill the class with goodies!
 		// first, we'll do the enums!
 		foreach(pbenum;enum_defs) {
-			ret ~= pbenum.toD1(indentCount);
+			ret ~= toD1(pbenum, indentCount);
 			ret ~= "\n\n";
 		}
 		// now, we'll do the nested messages
 		foreach(pbmsg;message_defs) {
-			ret ~= pbmsg.toD1(indentCount);
+			ret ~= toD1(pbmsg, indentCount);
 			ret ~= "\n\n";
 		}
 		// do the individual instantiations
 		foreach(pbchild;children) {
-			ret ~= pbchild.toD1(indentCount);
+			ret ~= toD1(pbchild, indentCount);
 			ret ~= "\n";
 		}
 		// last, do the extension instantiations
@@ -475,10 +482,6 @@ string toD1(PBMessage msg, int indentCount = 0) {
 		ret ~= "\n";
 		// deal with what little we need to do for extensions
 		ret ~= extensions.genExtString(indent~"static ");
-		// include a static opcall to do deserialization to make coding simpler
-		ret ~= indent~"static "~name~" opCall(ref ubyte[]input) {\n";
-		ret ~= indent~"	return Deserialize(input);\n";
-		ret ~= indent~"}\n";
 
 		// guaranteed to work, since we tack on a tab earlier
 		indent = indented(--indentCount);
@@ -487,20 +490,25 @@ string toD1(PBMessage msg, int indentCount = 0) {
 	return ret;
 }
 
+version(D_Version2)
 unittest {
     PBMessage PBCompileTime(ParserData pbstring) {
         return PBMessage(pbstring);
     }
 
+	mixin("import std.conv;\n");
+	mixin("static string makeString(T)(T v) {\n"~
+	"\treturn to!string(v);\n"~
+	"}\n");
+
 	// Conversion for optional
-	enum str = ParserData("message Test1 { required int32 a = 1; }");
-	enum msg = PBCompileTime(str);
-	import ProtocolBuffer.pbhelper;
-	import std.typecons;
+	mixin(`enum str = ParserData("message Test1 { required int32 a = 1; }");`);
+	mixin(`enum msg = PBCompileTime(str);`);
+	mixin(`import ProtocolBuffer.pbhelper;`);
+	mixin(`import std.typecons;`);
 	mixin("static " ~ msg.toD1);
 	ubyte[] feed = [0x08,0x96,0x01]; // From example
-	auto t1 = Test1(feed);
+	auto t1 = new Test1(feed);
 	assert(t1.a == 150);
 	assert(t1.Serialize() == feed);
 }
-

@@ -17,7 +17,7 @@ version(D_Version2) {
  */
 string indented(int indentCount) {
 	version(D_Version2)
-		return to!string(repeat("\t", indentCount).join.array);
+		return to!(string)(repeat("\t", indentCount).join.array);
 	else
 		return repeat("\t", indentCount);
 }
