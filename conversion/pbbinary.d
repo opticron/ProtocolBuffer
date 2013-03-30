@@ -1,37 +1,15 @@
-module ProtocolBuffer.pbhelper;
-
-import std.conv;
-import std.stdio;
-import std.string;
-import std.traits;
+/**
+ * This module provides the functions needed to convert to/from
+ * the Protocol Buffer binary format.
+ */
+module ProtocolBuffer.conversion.pbbinary;
 
 version(D_Version2) {
-} else {
-    int to(T)(string v) {
-        return atoi(v);
-    }
+	import std.conv;
+} else
+	import ProtocolBuffer.d1support;
 
-    string to(T)(int v) {
-        return toString(v);
-    }
-
-    string to(T, S)(ulong v, S redix) {
-        return toString(v, redix);
-    }
-
-    bool empty(T)(T[] v) {
-        return !v.length;
-    }
-    bool skipOver(ref string str, string c) {
-        if(str[0..c.length] == c) {
-            str = str[c.length..$];
-            return true;
-        }
-        return false;
-    }
-}
-
-// here is where all the encodings are defined and translated between bytes and real representations
+import std.stdio;
 
 // varint translation code
 // this may have endian issues, maybe not, we'll see

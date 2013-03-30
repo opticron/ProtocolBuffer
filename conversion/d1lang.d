@@ -15,7 +15,7 @@ version(D_Version2) {
 	import std.range;
 	import std.regex;
 } else
-	import ProtocolBuffer.pbhelper;
+	import ProtocolBuffer.d1support;
 
 import std.conv;
 import std.string : format;
@@ -504,7 +504,7 @@ unittest {
 	// Conversion for optional
 	mixin(`enum str = ParserData("message Test1 { required int32 a = 1; }");`);
 	mixin(`enum msg = PBCompileTime(str);`);
-	mixin(`import ProtocolBuffer.pbhelper;`);
+	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
 	mixin(`import std.typecons;`);
 	mixin("static " ~ msg.toD1);
 	ubyte[] feed = [0x08,0x96,0x01]; // From example

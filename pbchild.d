@@ -5,7 +5,7 @@ module ProtocolBuffer.pbchild;
 import ProtocolBuffer.pbgeneral;
 
 version(D_Version2) import std.range;
-else import ProtocolBuffer.pbhelper;
+else import ProtocolBuffer.d1support;
 
 import std.string;
 import std.stdio;

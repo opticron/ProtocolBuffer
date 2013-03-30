@@ -12,7 +12,7 @@ version(D_Version2) {
 	import std.algorithm;
 	import std.range;
 } else
-	import ProtocolBuffer.pbhelper;
+	import ProtocolBuffer.d1support;
 
 import std.conv;
 import std.stdio;
