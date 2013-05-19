@@ -200,10 +200,7 @@ in {
 	return true;
 }
 
-ParserData stripLWhite(ParserData s)
-in {
-	assert(s.length);
-} body {
+ParserData stripLWhite(ParserData s) {
 	size_t i;
 
 	for (i = 0; i < s.length; i++)

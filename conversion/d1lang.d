@@ -9,6 +9,7 @@ import ProtocolBuffer.pbchild;
 import ProtocolBuffer.pbenum;
 import ProtocolBuffer.pbmessage;
 import ProtocolBuffer.conversion.common;
+import ProtocolBuffer.conversion.pbbinary;
 
 version(D_Version2) {
 	import std.algorithm;
@@ -136,76 +137,140 @@ unittest {
     assert(!child.toD1().find(r"/// ditto").empty);
 }
 
+private string constructMismatchException(string type, int indentCount) {
+	auto indent = indented(indentCount);
+	auto ret = indent ~ "throw new Exception(\"Invalid wiretype \" ~\n";
+		ret ~= indent ~ "   makeString(wireType) ~\n";
+		ret ~= indent ~ "   \" for variable type "~type~"\");\n\n";
+	return ret;
+}
+
+private string constructUndecided(PBChild child, int indentCount, string tname) {
+	string ret;
+	// this covers enums and classes,
+	// since enums are declared as classes
+	// also, make sure we don't think we're root
+	with(child) {
+		ret ~= indented(indentCount++)~"static if (is("~type~":Object)) {\n";
+		ret ~= indented(indentCount) ~
+			"if(wireType != WireType.lenDelimited)\n";
+		ret ~= constructMismatchException(type, indentCount+1);
+
+		// no need to worry about packedness here, since it can't be
+		ret ~= indented(indentCount)~tname~" =\n";
+		ret ~= indented(indentCount)~"   "~type~".Deserialize(input,false);\n";
+		ret ~= indented(--indentCount)~
+			"} else static if (is("~type~" == enum)) {\n";
+		ret ~= indented(++indentCount) ~
+			"if(wireType != WireType.varint)\n";
+		ret ~= constructMismatchException(type, indentCount+1);
+
+		// worry about packedness here
+		ret ~= indented(indentCount++)~"if (wireType == WireType.varint) {\n";
+		if (modifier != "repeated") {
+			ret ~= indented(indentCount)~tname~" =\n";
+			ret ~= indented(indentCount)~"   cast("~toDType(type)~")\n";
+			ret ~= indented(indentCount)~"   fromVarint!(int)(input);\n";
+		} else {
+			ret ~= indented(indentCount)~"add_"~tname~"(\n";
+			ret ~= indented(indentCount)~"   cast("~toDType(type)~")\n";
+			ret ~= indented(indentCount)~"   fromVarint!(int)(input));\n";
+			ret ~= indented(--indentCount)~"} else if (wireType == WireType.lenDelimited) {\n";
+			ret ~= indented(++indentCount)~tname~" =\n";
+			ret ~= indented(indentCount)~"   fromPacked!("~toDType(type)~
+				",fromVarint!(int))(input);\n";
+			ret ~= indented(indentCount)~tname~" =\n";
+			ret ~= indented(indentCount)~"   fromPacked!("~toDType(type)~
+				",fromVarint!(int))(input);\n";
+		}
+		ret ~= indented(--indentCount)~"}\n";
+		ret ~= indented(--indentCount)~"} else\n";
+		ret ~= indented(indentCount+1) ~ "static assert(0,\n";
+		ret ~= indented(indentCount+1) ~
+			"  \"Can't identify type `" ~ type ~ "`\");\n";
+	}
+	return ret;
+}
+
 string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 	string ret;
 	auto indent = indented(indentCount);
 	with(child) {
+		if(type == "group")
+			throw new Exception("Group type not supported");
+
 		string tname = name;
 		if (is_exten) tname = "__exten"~tname;
 		// check header ubyte with case since we're guaranteed to be in a switch
 		ret ~= indent~"case "~to!(string)(index)~":\n";
 		indent = indented(++indentCount);
-		// check the header vs the type
+
+		// Class and Enum will have an undecided type
+		if(wTFromType(type) == WireType.undecided)
+			return ret ~ constructUndecided(child, indentCount, tname);
+
+		// Handle Packed type
+		if (packed) {
+			assert(modifier == "repeated");
+			assert(isPackable(type));
+			// Allow reading data even when not packed
+			ret ~= indent~"if (wireType != WireType.lenDelimited)\n";
+			++indentCount;
+		}
+
+		// Verify wire type is expected type else
+		// this is not condoned, wiretype is invalid, so explode!
+		ret ~= indented(indentCount)~"if (wireType != " ~
+			to!(string)(cast(byte)wTFromType(type))~")\n";
+		ret ~= constructMismatchException(type, indentCount+1);
+
+		if (packed)
+			--indentCount;
+
 		string pack;
-		ret ~= indent~"if (getWireType(header) == "~to!(string)(wTFromType(type))~") {\n";
-		indent = indented(++indentCount);
-		ret ~= indent~tname~" "~(modifier=="repeated"?"~":"")~"= ";
-		bool isobj = false;
 		switch(type) {
 		case "float","double","sfixed32","sfixed64","fixed32","fixed64":
 			pack = "fromByteBlob!("~toDType(type)~")";
-			ret ~= pack~"(input);\n";
 			break;
 		case "bool","int32","int64","uint32","uint64":
 			pack = "fromVarint!("~toDType(type)~")";
-			ret ~= pack~"(input);\n";
 			break;
 		case "sint32","sint64":
 			pack = "fromSInt!("~toDType(type)~")";
-			ret ~= pack~"(input);\n";
 			break;
 		case "string","bytes":
 			// no need to worry about packedness here, since it can't be
-			ret ~= "fromByteString!("~toDType(type)~")(input);\n";
-			break;
+			ret ~= indented(indentCount)~tname ~ " =\n";
+			ret ~= indented(indentCount)~"   fromByteString!("~
+				toDType(type)~")(input);\n";
+			return ret;
 		default:
-			// this covers enums and classen, since enums are declared as classes
-			// also, make sure we don't think we're root
-			isobj = true;
-			indent = indented(--indentCount);
-			ret = indented(indentCount-1)~"case "~to!(string)(index)~":\n";
-			ret ~= indent~"static if (is("~type~":Object)) {\n";
-			// no need to worry about packedness here, since it can't be
-			ret ~= indented(indentCount+1)~tname~" "~(modifier=="repeated"?"~":"")~"= "~type~".Deserialize(input,false);\n";
-			ret ~= indent~"} else {\n";
-			ret ~= indented(indentCount+1)~"// this is an enum, almost certainly\n";
-			// worry about packedness here
-			ret ~= indented(indentCount+1)~"if (getWireType(header) == 0) {\n";
-			ret ~= indented(indentCount+2)~""~tname~" "~(modifier=="repeated"?"~":"")~"= fromVarint!(int)(input);\n";
-			if (modifier == "repeated") {
-				ret ~= indented(indentCount+1)~"} else if (getWireType(header) == 2) {\n";
-				ret ~= indented(indentCount+2)~tname~" ~= fromPacked!("~toDType(type)~",fromVarint!(int))(input);\n";
-			}
-			ret ~= indented(indentCount+1)~"} else {\n";
-			// this is not condoned, wiretype is invalid, so explode!
-			ret ~= indented(indentCount+2)~"throw new Exception(\"Invalid wiretype \"~makeString(getWireType(header))~\" for variable type "~type~"\");\n";
-			ret ~= indent~"	}\n";
-			ret ~= indent~"}\n";
-			break;
+			assert(0, "class/enum/group handled by undecided type.");
 		}
-		if (!isobj) {
-			indent = indented(--indentCount);
-			if (modifier == "repeated" && isPackable(type)) {
-				ret ~= indent~"} else if (getWireType(header) == 2) {\n";
-				ret ~= indented(indentCount+1)~tname~" ~= fromPacked!("~toDType(type)~","~pack~")(input);\n";
-			}
-			ret ~= indent~"} else {\n";
-			// this is not condoned, wiretype is invalid, so explode!
-			ret ~= indent~"	throw new Exception(\"Invalid wiretype \"~makeString(getWireType(header))~\" for variable type "~type~"\");\n";
-			ret ~= indent~"}\n";
+
+		if(packed) {
+			ret ~= indented(indentCount++)~
+				"if (wireType == WireType.lenDelimited) {\n";
+			ret ~= indented(indentCount) ~ "add_" ~ tname ~ "(\n";
+			ret ~= indented(indentCount) ~
+				"   fromPacked!("~toDType(type)~","~pack~")(input));\n";
+			ret ~= indented(--indentCount) ~
+				"//Accept data even when not packed\n";
+			ret ~= indented(indentCount++) ~ "} else {\n";
 		}
+
+		if(modifier == "repeated") {
+			ret ~= indented(indentCount) ~ "add_" ~ tname ~ "(\n";
+			ret ~= indented(indentCount) ~ "   " ~ pack ~ "(input));\n";
+		} else {
+			ret ~= indented(indentCount) ~ tname ~ " =\n";
+			ret ~= indented(indentCount) ~ "   " ~ pack ~ "(input);\n";
+		}
+
+		if(packed) ret ~= indented(--indentCount) ~ "}\n";
+
 		// tack on the break so we don't have fallthrough
-		ret ~= indent~"break;\n";
+		ret ~= indented(--indentCount)~"break;\n";
 		return ret;
 	}
 }
@@ -214,6 +279,9 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 	string ret;
 	auto indent = indented(indentCount);
 	with(child) {
+		if(type == "group")
+			throw new Exception("Group type not supported");
+
 		string tname = name;
 		if (is_exten) tname = "__exten"~tname;
 		if (modifier == "repeated" && !packed) {
@@ -222,6 +290,7 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			indent = indented(++indentCount);
 		}
 		string func;
+		bool customType = false;
 		switch(type) {
 		case "float","double","sfixed32","sfixed64","fixed32","fixed64":
 			func = "toByteBlob";
@@ -238,12 +307,13 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			break;
 		default:
 			// this covers defined messages and enums
-			func = "toVarint!(int)";
+			func = "toVarint";
+			customType = true;
 			break;
 		}
 		// we have to have some specialized code to deal with enums vs user-defined classes, since they are both detected the same
-		if (func == "toVarint!(int)") {
-			ret ~= indent~"static if (is("~type~":Object)) {\n";
+		if (customType) {
+			ret ~= indent~"static if (is("~type~" : Object)) {\n";
 			// packed only works for primitive types, so take care of normal repeated serialization here
 			// since we can't easily detect this without decent type resolution in the .proto parser
 			if (modifier == "repeated" && packed) {
@@ -256,28 +326,37 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 				ret ~= indent~"}\n";
 			}
 			// done taking care of unpackable classes
-			ret ~= indent~"} else {\n";
+			ret ~= indent~"} else static if (is("~type~" == enum)) {\n";
 			indent = indented(++indentCount);
-			ret ~= indent~"// this is an enum, almost certainly\n";
 		}
 		// take care of packed circumstances
 		ret ~= indent;
-		if (modifier == "repeated" && packed) {
-			ret ~= "ret ~= toPacked!("~toDType(type)~","~func~")";
+		if (packed) {
+			assert(modifier == "repeated");
+			auto packType = toDType(type);
+			if(customType)
+				packType = "int";
+			ret ~= "if(!has_"~tname~")\n" ~ indented(indentCount+1);
+			ret ~= "ret ~= toPacked!("~packType~"[],"~func~")";
 		} else {
 			if (modifier != "repeated" && modifier != "required")
-				ret ~= "if (_has_"~tname~") ";
+				ret ~= "if (!has_"~tname~") ";
 			ret ~= "ret ~= "~func;
 		}
 		// finish off the parameters, because they're the same for packed or not
+		if(tname != "iter") {
+			if(packed && customType)
+				tname = "cast(int[])" ~ tname;
+		}
 		ret ~= "("~tname~","~to!(string)(index)~");\n";
-		if (func == "toVarint!(int)") {
-			indent = indented(--indentCount);
-			ret ~= indent~"}\n";
+		if (customType) {
+			ret ~= indented(--indentCount)~"} else\n";
+			ret ~= indented(indentCount+1)~
+				"static assert(0,\"Can't identify type `"
+				~ type ~ "`\");\n";
 		}
 		if (modifier == "repeated" && !packed) {
-			indent = indented(--indentCount);
-			ret ~= indent~"}\n";
+			ret ~= indented(--indentCount)~"}\n";
 		}
 	}
 	return ret;
@@ -358,6 +437,7 @@ string genDes(PBMessage msg, int indentCount = 0) {
 		ret ~= indent~"while(input.length) {\n";
 		indent = indented(++indentCount);
 		ret ~= indent~"int header = fromVarint!(int)(input);\n";
+		ret ~= indent~"auto wireType = getWireType(header);\n";
 		ret ~= indent~"switch(getFieldNumber(header)) {\n";
 		//here goes the meat, handily, it is generated in the children
 		foreach(pbchild;children) {
@@ -428,9 +508,9 @@ string genMerge(PBMessage msg, int indentCount = 0) {
 		indent = indented(++indentCount);
 		// merge code
 		foreach(pbchild;children) if (pbchild.modifier != "repeated") {
-			ret ~= indent~"if (merger._has_"~pbchild.name~") "~pbchild.name~" = merger."~pbchild.name~";\n";
+			ret ~= indent~"if (merger.has_"~pbchild.name~") "~pbchild.name~" = merger."~pbchild.name~";\n";
 		} else {
-			ret ~= indent~"if (merger._has_"~pbchild.name~") add_"~pbchild.name~"(merger."~pbchild.name~");\n";
+			ret ~= indent~"if (merger.has_"~pbchild.name~") add_"~pbchild.name~"(merger."~pbchild.name~");\n";
 		}
 		indent = indented(--indentCount);
 		ret ~= indent~"}\n";
@@ -511,4 +591,10 @@ unittest {
 	auto t1 = new Test1(feed);
 	assert(t1.a == 150);
 	assert(t1.Serialize() == feed);
+}
+
+unittest {
+	auto str = ParserData("optional OtherType type = 1;");
+	auto ms = PBChild(str);
+    toD1(ms);
 }

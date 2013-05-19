@@ -11,6 +11,16 @@ version(D_Version2) {
 
 import std.stdio;
 
+enum WireType : byte {
+    varint,
+    fixed64,
+    lenDelimited,
+    startGroup, // Deprecated
+    endGroup, // Deprecated
+    fixed32,
+    undecided = -1
+}
+
 // varint translation code
 // this may have endian issues, maybe not, we'll see
 ubyte[]toVarint(bool input,int field) {
@@ -291,7 +301,7 @@ ubyte[]ripUField(ref ubyte[]input,int wiretype) {
 }
 
 // handle packed fields
-ubyte[]toPacked(T:T[],alias serializer)(T[]packed,int field) {
+ubyte[]toPacked(T:T[],alias serializer)(T[] packed,int field) {
 	// zero length packed repeated fields serialize to nothing
 	if (!packed.length) return null;
 	ubyte[]ret;
@@ -314,7 +324,7 @@ T[]fromPacked(T,alias deserializer)(ref ubyte[]input) {
 	ubyte[]own = input[0..len];
 	input = input[len..$];
 	while(own.length) {
-		ret ~= deserializer(own);
+		ret ~= cast(T) deserializer(own);
 	}
 	return ret;
 }

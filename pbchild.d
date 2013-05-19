@@ -3,6 +3,7 @@
 // code to read and write the specified format
 module ProtocolBuffer.pbchild;
 import ProtocolBuffer.pbgeneral;
+import ProtocolBuffer.conversion.pbbinary;
 
 version(D_Version2) import std.range;
 else import ProtocolBuffer.d1support;
@@ -168,24 +169,26 @@ unittest {
 }
 
 bool isPackable(string type) {
-	ubyte wt = wTFromType(type);
-	if (wt == 0 || wt == 1 || wt == 5) {
+	auto wt = wTFromType(type);
+	if (wt == WireType.varint
+        || wt == WireType.fixed64
+        || wt == WireType.fixed32) {
 		return true;
 	}
 	return false;
 }
 
-ubyte wTFromType(string type) {
+WireType wTFromType(string type) {
 	switch(type) {
 	case "float","sfixed32","fixed32":
-		return cast(ubyte)5;
+		return WireType.fixed32;
 	case "double","sfixed64","fixed64":
-		return cast(ubyte)1;
+		return WireType.fixed64;
 	case "bool","int32","int64","uint32","uint64","sint32","sint64":
-		return cast(ubyte)0;
+		return WireType.varint;
 	case "string","bytes":
-		return cast(ubyte)2;
+		return WireType.lenDelimited;
 	default:
+        return WireType.undecided;
 	}
-	throw new Exception("Type Classification - Unknown type string: " ~ type);
 }
