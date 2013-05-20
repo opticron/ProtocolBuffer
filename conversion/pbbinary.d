@@ -1,37 +1,25 @@
-module ProtocolBuffer.pbhelper;
-
-import std.conv;
-import std.stdio;
-import std.string;
-import std.traits;
+/**
+ * This module provides the functions needed to convert to/from
+ * the Protocol Buffer binary format.
+ */
+module ProtocolBuffer.conversion.pbbinary;
 
 version(D_Version2) {
-} else {
-    int to(T)(string v) {
-        return atoi(v);
-    }
+	import std.conv;
+} else
+	import ProtocolBuffer.d1support;
 
-    string to(T)(int v) {
-        return toString(v);
-    }
+import std.stdio;
 
-    string to(T, S)(ulong v, S redix) {
-        return toString(v, redix);
-    }
-
-    bool empty(T)(T[] v) {
-        return !v.length;
-    }
-    bool skipOver(ref string str, string c) {
-        if(str[0..c.length] == c) {
-            str = str[c.length..$];
-            return true;
-        }
-        return false;
-    }
+enum WireType : byte {
+    varint,
+    fixed64,
+    lenDelimited,
+    startGroup, // Deprecated
+    endGroup, // Deprecated
+    fixed32,
+    undecided = -1
 }
-
-// here is where all the encodings are defined and translated between bytes and real representations
 
 // varint translation code
 // this may have endian issues, maybe not, we'll see
@@ -313,7 +301,7 @@ ubyte[]ripUField(ref ubyte[]input,int wiretype) {
 }
 
 // handle packed fields
-ubyte[]toPacked(T:T[],alias serializer)(T[]packed,int field) {
+ubyte[]toPacked(T:T[],alias serializer)(T[] packed,int field) {
 	// zero length packed repeated fields serialize to nothing
 	if (!packed.length) return null;
 	ubyte[]ret;
@@ -336,7 +324,7 @@ T[]fromPacked(T,alias deserializer)(ref ubyte[]input) {
 	ubyte[]own = input[0..len];
 	input = input[len..$];
 	while(own.length) {
-		ret ~= deserializer(own);
+		ret ~= cast(T) deserializer(own);
 	}
 	return ret;
 }

@@ -6,7 +6,7 @@ version(D_Version2) {
 	import std.algorithm;
 	import std.range;
 } else
-	import ProtocolBuffer.pbhelper;
+	import ProtocolBuffer.d1support;
 
 import std.stdio;
 import std.string;
@@ -200,10 +200,7 @@ in {
 	return true;
 }
 
-ParserData stripLWhite(ParserData s)
-in {
-	assert(s.length);
-} body {
+ParserData stripLWhite(ParserData s) {
 	size_t i;
 
 	for (i = 0; i < s.length; i++)

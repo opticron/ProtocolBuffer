@@ -13,7 +13,7 @@ version(D_Version2) {
 	import std.algorithm;
 	import std.range;
 } else
-	import ProtocolBuffer.pbhelper;
+	import ProtocolBuffer.d1support;
 
 import std.string;
 import std.stdio;
@@ -30,7 +30,7 @@ struct PBRoot {
 	}
 	string langD1() {
 		string retstr = "";
-		retstr ~= "import ProtocolBuffer.pbhelper;\n";
+		retstr ~= "import ProtocolBuffer.conversion.pbbinary;\n";
 		retstr ~= "import std.string;\n\n";
 
 		retstr ~= "version(D_Version2) {\n";
@@ -59,7 +59,7 @@ struct PBRoot {
     }
 	string langD() {
 		string retstr = "";
-		retstr ~= "import ProtocolBuffer.pbhelper;\n";
+		retstr ~= "import ProtocolBuffer.conversion.pbbinary;\n";
 		retstr ~= "import std.conv;\n";
 		retstr ~= "import std.typecons;\n\n";
 
