@@ -40,14 +40,18 @@ string toD1(PBChild child, int indentCount = 0) {
 	string ret;
 	auto indent = indented(indentCount);
 	with(child) {
-		ret ~= indent~toDType(type)~(modifier=="repeated"?"[]_":" _")~name~(valdefault.length?" = "~valdefault:"")~";\n";
+		ret ~= indent~toDType(type)~(modifier=="repeated"?"[]_":" _")~
+			name~(valdefault.length?" = "~valdefault:"")~";\n";
 
 		foreach(c; comments)
 			ret ~= indent ~ (c.empty() ? "":"/") ~ c ~ "\n";
 		if(comments.empty())
 			ret ~= indent ~ "///\n";
+		auto fieldName = name;
+		if(isReserved(fieldName))
+			fieldName = name ~ "_";
 		// get accessor
-		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~name~"() {\n";
+		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~fieldName~"() {\n";
 		ret ~= indent~"	return _"~name~";\n";
 		ret ~= indent~"}\n";
 
@@ -56,7 +60,8 @@ string toD1(PBChild child, int indentCount = 0) {
 		else
 			ret ~= indent ~ "///\n";
 		// set accessor
-		ret ~= indent~(is_dep?"deprecated ":"")~"void "~name~"("~toDType(type)~(modifier=="repeated"?"[]":" ")~"input_var) {\n";
+		ret ~= indent~(is_dep?"deprecated ":"")~"void "~fieldName~
+			"("~toDType(type)~(modifier=="repeated"?"[]":" ")~"input_var) {\n";
 		ret ~= indent~"	_"~name~" = input_var;\n";
 
 		if (modifier != "repeated") ret ~= indent~"	_has_"~name~" = true;\n";
@@ -208,6 +213,9 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 
 		string tname = name;
 		if (is_exten) tname = "__exten"~tname;
+		if(isReserved(tname)) {
+			tname = tname ~ "_";
+		}
 		// check header ubyte with case since we're guaranteed to be in a switch
 		ret ~= indent~"case "~to!(string)(index)~":\n";
 		indent = indented(++indentCount);
@@ -301,6 +309,9 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			ret ~= indent~"foreach(iter;"~tname~") {\n";
 			tname = "iter";
 			indent = indented(++indentCount);
+		}
+		if(isReserved(tname)) {
+			tname = tname ~ "_";
 		}
 		string func;
 		bool customType = false;
@@ -520,10 +531,17 @@ string genMerge(PBMessage msg, int indentCount = 0) {
 		ret ~= indent~"void MergeFrom("~name~" merger) {\n";
 		indent = indented(++indentCount);
 		// merge code
-		foreach(pbchild;children) if (pbchild.modifier != "repeated") {
-			ret ~= indent~"if (merger.has_"~pbchild.name~") "~pbchild.name~" = merger."~pbchild.name~";\n";
-		} else {
-			ret ~= indent~"if (merger.has_"~pbchild.name~") add_"~pbchild.name~"(merger."~pbchild.name~");\n";
+		foreach(pbchild;children) {
+			auto field = pbchild.name;
+			if(isReserved(field))
+				field = pbchild.name ~ "_";
+			if (pbchild.modifier != "repeated") {
+				ret ~= indent~"if (merger.has_"~pbchild.name~") "~
+					field~" = merger."~field~";\n";
+			} else {
+				ret ~= indent~"if (merger.has_"~pbchild.name~") add_"~
+					field~"(merger."~field~");\n";
+			}
 		}
 		indent = indented(--indentCount);
 		ret ~= indent~"}\n";
@@ -581,6 +599,33 @@ string toD1(PBMessage msg, int indentCount = 0) {
 		ret ~= indent~"}\n";
 	}
 	return ret;
+}
+
+bool isReserved(string field) {
+	string[] words = [
+"Error", "Exception", "Object", "Throwable", "__argTypes", "__ctfe",
+	"__gshared", "__monitor", "__overloadset", "__simd", "__traits",
+	"__vector", "__vptr", "_argptr", "_arguments", "_ctor", "_dtor",
+	"abstract", "alias", "align", "assert", "auto", "body", "bool", "break",
+	"byte", "cast", "catch", "cdouble", "cent", "cfloat", "char", "class",
+	"const", "contained", "continue", "creal", "dchar", "debug", "delegate",
+	"delete", "deprecated", "do", "double", "dstring", "else", "enum",
+	"export", "extern", "false", "final", "finally", "float", "float", "for",
+	"foreach", "foreach_reverse", "function", "goto", "idouble", "if",
+	"ifloat", "immutable", "import", "in", "in", "inout", "int", "int",
+	"interface", "invariant", "ireal", "is", "lazy", "lazy", "long", "long",
+	"macro", "mixin", "module", "new", "nothrow", "null", "out", "out",
+	"override", "package", "pragma", "private", "protected", "public", "pure",
+	"real", "ref", "return", "scope", "shared", "short", "static", "string",
+	"struct", "super", "switch", "synchronized", "template", "this", "throw",
+	"true", "try", "typedef", "typeid", "typeof", "ubyte", "ucent", "uint",
+	"uint", "ulong", "ulong", "union", "unittest", "ushort", "ushort",
+	"version", "void", "volatile", "wchar", "while", "with", "wstring"];
+
+	foreach(string w; words)
+		if(w == field)
+			return true;
+	return false;
 }
 
 version(D_Version2)
