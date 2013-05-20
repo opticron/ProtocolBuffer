@@ -228,4 +228,3 @@ unittest {
 	assert(ms.message_defs[0].comments[0] == "// I comment types");
 	assert(ms.message_defs[0].children[1].comments[0] == "// Their type of phone");
 }
-

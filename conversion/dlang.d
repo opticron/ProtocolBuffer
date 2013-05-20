@@ -654,3 +654,24 @@ unittest {
 	assert(t2.b == "testing");
 	assert(t2.Serialize() == feed);
 }
+
+version(D_Version2)
+unittest {
+	PBMessage PBCompileTime(ParserData pbstring) {
+		return PBMessage(pbstring);
+	}
+
+	// Conversion for repated packed
+	mixin(`enum str = ParserData("message Test2 {
+								 repeated string b = 2; }");`);
+	mixin(`enum msg = PBCompileTime(str);`);
+	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import std.typecons;`);
+	mixin("static " ~ msg.toD);
+	ubyte[] feed = [0x12,0x07, // (tag 2, type 2) (length 7)
+		0x74,0x65,0x73,0x74,0x69,0x6e,0x67
+			]; // From example
+	auto t2 = Test2(feed);
+	assert(t2.b == ["testing"]);
+	assert(t2.Serialize() == feed);
+}

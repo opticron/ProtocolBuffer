@@ -216,6 +216,8 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 		if(isReserved(tname)) {
 			tname = tname ~ "_";
 		}
+		auto nameForAdd = name;
+		if (is_exten) nameForAdd = "__exten"~nameForAdd;
 		// check header ubyte with case since we're guaranteed to be in a switch
 		ret ~= indent~"case "~to!(string)(index)~":\n";
 		indent = indented(++indentCount);
@@ -272,7 +274,7 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 		if(packed) {
 			ret ~= indented(indentCount++)~
 				"if (wireType == WireType.lenDelimited) {\n";
-			ret ~= indented(indentCount) ~ "add_" ~ tname ~ "(\n";
+			ret ~= indented(indentCount) ~ "add_" ~ nameForAdd ~ "(\n";
 			ret ~= indented(indentCount) ~
 				"   fromPacked!("~toDType(type)~","~pack~")(input));\n";
 			ret ~= indented(--indentCount) ~
@@ -281,7 +283,7 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 		}
 
 		if(modifier == "repeated") {
-			ret ~= indented(indentCount) ~ "add_" ~ tname ~ "(\n";
+			ret ~= indented(indentCount) ~ "add_" ~ nameForAdd ~ "(\n";
 			ret ~= indented(indentCount) ~ "   " ~ pack ~ "(input));\n";
 		} else {
 			ret ~= indented(indentCount) ~ tname ~ " =\n";
@@ -353,6 +355,8 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			ret ~= indent~"} else static if (is("~type~" == enum)) {\n";
 			indent = indented(++indentCount);
 		}
+		auto nameForHas = name;
+		if (is_exten) nameForHas = "__exten"~nameForHas;
 		// take care of packed circumstances
 		ret ~= indent;
 		if (packed) {
@@ -360,11 +364,11 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			auto packType = toDType(type);
 			if(customType)
 				packType = "int";
-			ret ~= "if(!has_"~tname~")\n" ~ indented(indentCount+1);
+			ret ~= "if(!has_"~nameForHas~")\n" ~ indented(indentCount+1);
 			ret ~= "ret ~= toPacked!("~packType~"[],"~func~")";
 		} else {
 			if (modifier != "repeated" && modifier != "required")
-				ret ~= "if (!has_"~tname~") ";
+				ret ~= "if (!has_"~nameForHas~") ";
 			ret ~= "ret ~= "~func;
 		}
 		// finish off the parameters, because they're the same for packed or not
@@ -524,7 +528,7 @@ string genSer(PBMessage msg, int indentCount = 0) {
 	}
 	return ret;
 }
-string genMerge(PBMessage msg, int indentCount = 0) {
+string genMerge(PBMessage msg, int indentCount = 0, bool is_exten = false) {
 	auto indent = indented(indentCount);
 	string ret = "";
 	with(msg) {
@@ -532,15 +536,19 @@ string genMerge(PBMessage msg, int indentCount = 0) {
 		indent = indented(++indentCount);
 		// merge code
 		foreach(pbchild;children) {
-			auto field = pbchild.name;
-			if(isReserved(field))
-				field = pbchild.name ~ "_";
+			string tname = pbchild.name;
+			if (is_exten) tname = "__exten"~tname;
+			auto nameForAdd = tname;
+			if(isReserved(tname)) {
+				tname = tname ~ "_";
+			}
+
 			if (pbchild.modifier != "repeated") {
-				ret ~= indent~"if (merger.has_"~pbchild.name~") "~
-					field~" = merger."~field~";\n";
+				ret ~= indent~"if (merger.has_"~nameForAdd~") "~
+					tname~" = merger."~tname~";\n";
 			} else {
-				ret ~= indent~"if (merger.has_"~pbchild.name~") add_"~
-					field~"(merger."~field~");\n";
+				ret ~= indent~"if (merger.has_"~nameForAdd~") add_"~
+					nameForAdd~"(merger."~tname~");\n";
 			}
 		}
 		indent = indented(--indentCount);
