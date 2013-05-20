@@ -157,8 +157,15 @@ private string constructUndecided(PBChild child, int indentCount, string tname) 
 		ret ~= constructMismatchException(type, indentCount+1);
 
 		// no need to worry about packedness here, since it can't be
-		ret ~= indented(indentCount)~tname~" =\n";
-		ret ~= indented(indentCount)~"   "~type~".Deserialize(input,false);\n";
+		if(modifier == "repeated") {
+			ret ~= indented(indentCount)~"add_"~tname~"(\n";
+			ret ~= indented(indentCount)~"   "~type~
+				".Deserialize(input,false));\n";
+		} else {
+			ret ~= indented(indentCount)~tname~" =\n";
+			ret ~= indented(indentCount)~"   "~type~
+				".Deserialize(input,false);\n";
+		}
 		ret ~= indented(--indentCount)~
 			"} else static if (is("~type~" == enum)) {\n";
 		ret ~= indented(++indentCount) ~
@@ -240,9 +247,15 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 			break;
 		case "string","bytes":
 			// no need to worry about packedness here, since it can't be
-			ret ~= indented(indentCount)~tname ~ " =\n";
-			ret ~= indented(indentCount)~"   fromByteString!("~
-				toDType(type)~")(input);\n";
+			if(modifier == "repeated") {
+				ret ~= indented(indentCount)~"add_"~tname ~ "(\n";
+				ret ~= indented(indentCount)~"   fromByteString!("~
+					toDType(type)~")(input));\n";
+			} else {
+				ret ~= indented(indentCount)~tname ~ " =\n";
+				ret ~= indented(indentCount)~"   fromByteString!("~
+					toDType(type)~")(input);\n";
+			}
 			return ret;
 		default:
 			assert(0, "class/enum/group handled by undecided type.");
