@@ -49,7 +49,10 @@ string toD(PBChild child, int indentCount = 0) {
 		// Make field declaration
 		ret ~= indent ~ (is_dep ? "deprecated " : "");
 		ret ~= typeWrapper(child);
-		ret ~= " " ~ name;
+		if(isReserved(name))
+			ret ~= " " ~ name ~ "_";
+		else
+			ret ~= " " ~ name;
 		if(!empty(valdefault)) // Apply default value
 			ret ~= " = " ~ valdefault;
 		ret ~= ";";
@@ -159,6 +162,9 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 
 		string tname = name;
 		if (is_exten) tname = "__exten"~tname;
+		if(isReserved(tname)) {
+			tname = tname ~ "_";
+		}
 		if (modifier == "repeated")
 			tname = tname ~ " = new "~toDType(type)~"[](0); " ~ tname ~ " ~=";
 		else
@@ -246,6 +252,9 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			ret ~= indent~"foreach(iter;"~tname~".get()) {\n";
 			tname = "iter";
 			indent = indented(++indentCount);
+		}
+		if(isReserved(tname)) {
+			tname = tname ~ "_";
 		}
 		string func;
 		bool customType = false;
@@ -407,8 +416,11 @@ string genDes(PBMessage msg, int indentCount = 0) {
 		// take care of default case
 		ret ~= indent~"default:\n";
 		ret ~= indent~"	// rip off unknown fields\n";
-		ret ~= indent~"	ufields ~= _toVarint(header)~ripUField(input,getWireType(header));\n";
-		ret ~= indent~"	break;\n";
+		ret ~= indent~"if(input.length)\n";
+		ret ~= indented(indentCount+1)~"ufields ~= _toVarint(header)~\n";
+		ret ~= indented(indentCount+1)~
+			"   ripUField(input,getWireType(header));\n";
+		ret ~= indent~"break;\n";
 		ret ~= indent~"}\n";
 		indent = indented(--indentCount);
 		ret ~= indent~"}\n";
@@ -418,7 +430,10 @@ string genDes(PBMessage msg, int indentCount = 0) {
 			ret ~= indent~"if (_has__exten_"~pbchild.name~" == false) throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n";
 		}
 		foreach(pbchild;children) if (pbchild.modifier == "required") {
-			ret ~= indent~"if ("~pbchild.name~".isNull) throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n";
+			auto field = pbchild.name;
+			if(isReserved(field))
+				field = field ~ "_";
+			ret ~= indent~"if ("~field~".isNull) throw new Exception(\"Did not find a "~field~" in the message parse.\");\n";
 		}
 		indent = indented(--indentCount);
 		ret ~= indent~"}\n";
@@ -465,11 +480,18 @@ string genMerge(PBMessage msg, int indentCount = 0) {
 		ret ~= indent~"void MergeFrom("~name~" merger) {\n";
 		indent = indented(++indentCount);
 		// merge code
-		foreach(pbchild;children) if (pbchild.modifier != "repeated") {
-			ret ~= indent~"if (!merger."~pbchild.name~".isNull) "~pbchild.name~" = merger."~pbchild.name~";\n";
-		} else {
-			ret ~= indent~"if (!merger."~pbchild.name~".isNull) "~pbchild.name~" ~= merger."~pbchild.name~";\n";
-		}
+		foreach(pbchild;children) {
+			auto field = pbchild.name;
+			if(isReserved(field))
+				field = pbchild.name ~ "_";
+            if (pbchild.modifier != "repeated") {
+			ret ~= indent~"if (!merger."~field~".isNull) "~
+                field~" = merger."~field~";\n";
+            } else {
+                ret ~= indent~"if (!merger."~field~".isNull) "~
+                    field~" ~= merger."~field~";\n";
+            }
+        }
 		indent = indented(--indentCount);
 		ret ~= indent~"}\n";
 		return ret;
@@ -532,6 +554,37 @@ string toD(PBMessage msg, int indentCount = 0) {
 	return ret;
 }
 
+bool isReserved(string field) {
+	string[] words = [
+"Error", "Exception", "Object", "Throwable", "__argTypes", "__ctfe",
+	"__gshared", "__monitor", "__overloadset", "__simd", "__traits",
+	"__vector", "__vptr", "_argptr", "_arguments", "_ctor", "_dtor",
+	"abstract", "alias", "align", "assert", "auto", "body", "bool", "break",
+	"byte", "cast", "catch", "cdouble", "cent", "cfloat", "char", "class",
+	"const", "contained", "continue", "creal", "dchar", "debug", "delegate",
+	"delete", "deprecated", "do", "double", "dstring", "else", "enum",
+	"export", "extern", "false", "final", "finally", "float", "float", "for",
+	"foreach", "foreach_reverse", "function", "goto", "idouble", "if",
+	"ifloat", "immutable", "import", "in", "in", "inout", "int", "int",
+	"interface", "invariant", "ireal", "is", "lazy", "lazy", "long", "long",
+	"macro", "mixin", "module", "new", "nothrow", "null", "out", "out",
+	"override", "package", "pragma", "private", "protected", "public", "pure",
+	"real", "ref", "return", "scope", "shared", "short", "static", "string",
+	"struct", "super", "switch", "synchronized", "template", "this", "throw",
+	"true", "try", "typedef", "typeid", "typeof", "ubyte", "ucent", "uint",
+	"uint", "ulong", "ulong", "union", "unittest", "ushort", "ushort",
+	"version", "void", "volatile", "wchar", "while", "with", "wstring"];
+
+	foreach(string w; words)
+		if(w == field)
+			return true;
+	return false;
+}
+
+unittest {
+	assert(isReserved("version"));
+}
+
 version(D_Version2)
 unittest {
     PBMessage PBCompileTime(ParserData pbstring) {
@@ -579,4 +632,46 @@ unittest {
 	auto t4 = Test4(feed);
 	assert(t4.d == [3,270,86942]);
 	assert(t4.Serialize() == feed);
+}
+
+version(D_Version2)
+unittest {
+	PBMessage PBCompileTime(ParserData pbstring) {
+		return PBMessage(pbstring);
+	}
+
+	// Conversion for repated packed
+	mixin(`enum str = ParserData("message Test2 {
+								 required string b = 2; }");`);
+	mixin(`enum msg = PBCompileTime(str);`);
+	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import std.typecons;`);
+	mixin("static " ~ msg.toD);
+	ubyte[] feed = [0x12,0x07, // (tag 2, type 2) (length 7)
+		0x74,0x65,0x73,0x74,0x69,0x6e,0x67
+			]; // From example
+	auto t2 = Test2(feed);
+	assert(t2.b == "testing");
+	assert(t2.Serialize() == feed);
+}
+
+version(D_Version2)
+unittest {
+	PBMessage PBCompileTime(ParserData pbstring) {
+		return PBMessage(pbstring);
+	}
+
+	// Conversion for repated packed
+	mixin(`enum str = ParserData("message Test2 {
+								 repeated string b = 2; }");`);
+	mixin(`enum msg = PBCompileTime(str);`);
+	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import std.typecons;`);
+	mixin("static " ~ msg.toD);
+	ubyte[] feed = [0x12,0x07, // (tag 2, type 2) (length 7)
+		0x74,0x65,0x73,0x74,0x69,0x6e,0x67
+			]; // From example
+	auto t2 = Test2(feed);
+	assert(t2.b == ["testing"]);
+	assert(t2.Serialize() == feed);
 }
