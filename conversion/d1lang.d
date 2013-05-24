@@ -15,6 +15,16 @@ version(D_Version2) {
 	import std.algorithm;
 	import std.range;
 	import std.regex;
+	version(unittest) {
+		import std.conv;
+		string makeString(T)(T v) {
+			return to!(string)(v);
+		}
+		PBMessage PBCompileTime(ParserData pbstring) {
+			return PBMessage(pbstring);
+		}
+    }
+
 } else
 	import ProtocolBuffer.d1support;
 
@@ -75,7 +85,7 @@ string toD1(PBChild child, int indentCount = 0) {
 			ret ~= indent~"}\n";
 			// technically, they can just do class.item.length
 			// there is no need for this
-			ret ~= indent~(is_dep?"deprecated ":"")~"int "~name~"_size () {\n";
+			ret ~= indent~(is_dep?"deprecated ":"")~"size_t "~name~"_size () {\n";
 			ret ~= indent~"	return _"~name~".length;\n";
 			ret ~= indent~"}\n";
 			// functions to do additions, both singular and array
@@ -292,8 +302,6 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 
 		if(packed) ret ~= indented(--indentCount) ~ "}\n";
 
-		// tack on the break so we don't have fallthrough
-		ret ~= indented(--indentCount)~"break;\n";
 		return ret;
 	}
 }
@@ -364,7 +372,7 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			auto packType = toDType(type);
 			if(customType)
 				packType = "int";
-			ret ~= "if(!has_"~nameForHas~")\n" ~ indented(indentCount+1);
+			ret ~= "if(has_"~nameForHas~")\n" ~ indented(indentCount+1);
 			ret ~= "ret ~= toPacked!("~packType~"[],"~func~")";
 		} else {
 			if (modifier != "repeated" && modifier != "required")
@@ -470,6 +478,8 @@ string genDes(PBMessage msg, int indentCount = 0) {
 		//here goes the meat, handily, it is generated in the children
 		foreach(pbchild;children) {
 			ret ~= genDes(pbchild, indentCount);
+			// tack on the break so we don't have fallthrough
+			ret ~= indented(indentCount)~"break;\n";
 		}
 		foreach(pbchild;child_exten) {
 			ret ~= genDes(pbchild, indentCount, true);
@@ -477,7 +487,10 @@ string genDes(PBMessage msg, int indentCount = 0) {
 		// take care of default case
 		ret ~= indent~"default:\n";
 		ret ~= indent~"	// rip off unknown fields\n";
-		ret ~= indent~"	ufields ~= _toVarint(header)~ripUField(input,getWireType(header));\n";
+		ret ~= indent~"if(input.length)\n";
+		ret ~= indented(indentCount+1)~"ufields ~= _toVarint(header)~\n";
+		ret ~= indented(indentCount+1)~
+			"   ripUField(input,getWireType(header));\n";
 		ret ~= indent~"	break;\n";
 		ret ~= indent~"}\n";
 		indent = indented(--indentCount);
@@ -638,15 +651,6 @@ bool isReserved(string field) {
 
 version(D_Version2)
 unittest {
-    PBMessage PBCompileTime(ParserData pbstring) {
-        return PBMessage(pbstring);
-    }
-
-	mixin("import std.conv;\n");
-	mixin("static string makeString(T)(T v) {\n"~
-	"\treturn to!string(v);\n"~
-	"}\n");
-
 	// Conversion for optional
 	mixin(`enum str = ParserData("message Test1 { required int32 a = 1; }");`);
 	mixin(`enum msg = PBCompileTime(str);`);
@@ -663,4 +667,78 @@ unittest {
 	auto str = ParserData("optional OtherType type = 1;");
 	auto ms = PBChild(str);
     toD1(ms);
+}
+
+version(D_Version2)
+unittest {
+	// Conversion for repated packed
+	mixin(`enum str = ParserData("message Test4 {
+								 repeated int32 d = 4 [packed=true]; }");`);
+	mixin(`enum msg = PBCompileTime(str);`);
+	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import std.typecons;`);
+	mixin("static " ~ msg.toD1);
+	ubyte[] feed = [0x22, // Tag (field number 4, wire type 2)
+		0x06, // payload size (6 bytes)
+		0x03, // first element (varint 3)
+		0x8E,0x02, // second element (varint 270)
+		0x9E,0xA7,0x05 // third element (varint 86942)
+			]; // From example
+	auto t4 = new Test4(feed);
+	assert(t4.d == [3,270,86942]);
+	assert(t4.Serialize() == feed);
+}
+
+version(D_Version2)
+unittest {
+	// Conversion for repated packed
+	mixin(`enum str = ParserData("message Test2 {
+								 required string b = 2; }");`);
+	mixin(`enum msg = PBCompileTime(str);`);
+	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import std.typecons;`);
+	mixin("static " ~ msg.toD1);
+	ubyte[] feed = [0x12,0x07, // (tag 2, type 2) (length 7)
+		0x74,0x65,0x73,0x74,0x69,0x6e,0x67
+			]; // From example
+	auto t2 = new Test2(feed);
+	assert(t2.b == "testing");
+	assert(t2.Serialize() == feed);
+}
+
+version(D_Version2)
+unittest {
+	// Conversion for repated packed
+	mixin(`enum str = ParserData("message Test2 {
+								 repeated string b = 2; }");`);
+	mixin(`enum msg = PBCompileTime(str);`);
+	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import std.typecons;`);
+	mixin("static " ~ msg.toD1);
+	ubyte[] feed = [0x12,0x07, // (tag 2, type 2) (length 7)
+		0x74,0x65,0x73,0x74,0x69,0x6e,0x67
+			]; // From example
+	auto t2 = new Test2(feed);
+	assert(t2.b == ["testing"]);
+	assert(t2.Serialize() == feed);
+}
+
+version(D_Version2)
+unittest {
+	// Conversion for repated packed
+	mixin(`enum str = ParserData("message Test2 {
+	                              repeated string b = 2;
+	                              repeated string c = 3; }");`);
+	mixin(`enum msg = PBCompileTime(str);`);
+	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import std.typecons;`);
+	mixin("static " ~ msg.toD1);
+	ubyte[] feed = [0x09,(2<<3) | 2,0x07,
+		0x74,0x65,0x73,0x74,0x69,0x6e,0x67,
+		3<<3 | 0,0x08
+			];
+	auto feedans = feed;
+	auto t2 = new Test2(feed, false);
+	assert(t2.b == ["testing"]);
+	assert(t2.Serialize() == feedans[1..$-2]);
 }
