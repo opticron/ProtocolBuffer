@@ -232,9 +232,6 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 
 		if(packed)
 			ret ~= indented(indentCount++) ~ "}\n";
-
-		// tack on the break so we don't have fallthrough
-		ret ~= indented(--indentCount)~"break;\n";
 		return ret;
 	}
 }
@@ -249,6 +246,7 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 		string tname = name;
 		if (is_exten) tname = "__exten"~tname;
 		if (modifier == "repeated" && !packed) {
+			ret ~= indent~"if(!"~tname~".isNull)\n";
 			ret ~= indent~"foreach(iter;"~tname~".get()) {\n";
 			tname = "iter";
 			indent = indented(++indentCount);
@@ -409,6 +407,8 @@ string genDes(PBMessage msg, int indentCount = 0) {
 		//here goes the meat, handily, it is generated in the children
 		foreach(pbchild;children) {
 			ret ~= genDes(pbchild, indentCount);
+			// tack on the break so we don't have fallthrough
+			ret ~= indented(indentCount)~"break;\n";
 		}
 		foreach(pbchild;child_exten) {
 			ret ~= genDes(pbchild, indentCount, true);
@@ -674,4 +674,28 @@ unittest {
 	auto t2 = Test2(feed);
 	assert(t2.b == ["testing"]);
 	assert(t2.Serialize() == feed);
+}
+
+version(D_Version2)
+unittest {
+	PBMessage PBCompileTime(ParserData pbstring) {
+		return PBMessage(pbstring);
+	}
+
+	// Conversion for repated packed
+	mixin(`enum str = ParserData("message Test2 {
+	                              repeated string b = 2;
+	                              repeated string c = 3; }");`);
+	mixin(`enum msg = PBCompileTime(str);`);
+	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import std.typecons;`);
+	mixin("static " ~ msg.toD);
+	ubyte[] feed = [0x09,(2<<3) | 2,0x07,
+		0x74,0x65,0x73,0x74,0x69,0x6e,0x67,
+		3<<3 | 0,0x08
+			];
+	auto feedans = feed;
+	auto t2 = Test2(feed, false);
+	assert(t2.b == ["testing"]);
+	assert(t2.Serialize() == feedans[1..$-2]);
 }
