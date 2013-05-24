@@ -246,6 +246,7 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 		string tname = name;
 		if (is_exten) tname = "__exten"~tname;
 		if (modifier == "repeated" && !packed) {
+			ret ~= indent~"if(!"~tname~".isNull)\n";
 			ret ~= indent~"foreach(iter;"~tname~".get()) {\n";
 			tname = "iter";
 			indent = indented(++indentCount);
@@ -696,5 +697,5 @@ unittest {
 	auto feedans = feed;
 	auto t2 = Test2(feed, false);
 	assert(t2.b == ["testing"]);
-	//assert(t2.Serialize() == feedans[1..$-2]);
+	assert(t2.Serialize() == feedans[1..$-2]);
 }
