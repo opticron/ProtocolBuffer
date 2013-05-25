@@ -23,6 +23,9 @@ version(D_Version2) {
 		PBMessage PBCompileTime(ParserData pbstring) {
 			return PBMessage(pbstring);
 		}
+		PBEnum PBCTEnum(ParserData pbstring) {
+			return PBEnum(pbstring);
+		}
     }
 
 } else
@@ -183,14 +186,11 @@ private string constructUndecided(PBChild child, int indentCount, string tname) 
 		}
 		ret ~= indented(--indentCount)~
 			"} else static if (is("~type~" == enum)) {\n";
-		ret ~= indented(++indentCount) ~
-			"if(wireType != WireType.varint)\n";
-		ret ~= constructMismatchException(type, indentCount+1);
 
 		// worry about packedness here
-		ret ~= indented(indentCount++)~"if (wireType == WireType.varint) {\n";
+		ret ~= indented(++indentCount)~"if (wireType == WireType.varint) {\n";
 		if (modifier != "repeated") {
-			ret ~= indented(indentCount)~tname~" =\n";
+			ret ~= indented(++indentCount)~tname~" =\n";
 			ret ~= indented(indentCount)~"   cast("~toDType(type)~")\n";
 			ret ~= indented(indentCount)~"   fromVarint!(int)(input);\n";
 		} else {
@@ -201,11 +201,9 @@ private string constructUndecided(PBChild child, int indentCount, string tname) 
 			ret ~= indented(++indentCount)~tname~" =\n";
 			ret ~= indented(indentCount)~"   fromPacked!("~toDType(type)~
 				",fromVarint!(int))(input);\n";
-			ret ~= indented(indentCount)~tname~" =\n";
-			ret ~= indented(indentCount)~"   fromPacked!("~toDType(type)~
-				",fromVarint!(int))(input);\n";
 		}
-		ret ~= indented(--indentCount)~"}\n";
+		ret ~= indented(--indentCount)~"} else\n";
+		ret ~= constructMismatchException(type, indentCount+1);
 		ret ~= indented(--indentCount)~"} else\n";
 		ret ~= indented(indentCount+1) ~ "static assert(0,\n";
 		ret ~= indented(indentCount+1) ~
@@ -741,4 +739,25 @@ unittest {
 	auto t2 = new Test2(feed, false);
 	assert(t2.b == ["testing"]);
 	assert(t2.Serialize() == feedans[1..$-2]);
+}
+
+version(D_Version2)
+unittest {
+	// Conversion for repated packed
+	mixin(`enum um = ParserData("enum MyNum {
+	                              YES = 1; NO = 2; }");`);
+	mixin(`enum str = ParserData("message Test {
+	                              repeated MyNum b = 2 [packed=true]; }");`);
+	mixin(`enum msg = PBCompileTime(str);`);
+	mixin(`enum yum = PBCTEnum(um);`);
+	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import std.typecons;`);
+	mixin(yum.toD1);
+	mixin("static " ~ msg.toD1);
+	ubyte[] feed = [(2<<3) | 2,0x02,
+		0x01,0x02
+			];
+	auto t = new Test(feed);
+	assert(t.b == [MyNum.YES, MyNum.NO]);
+	assert(t.Serialize() == feed);
 }

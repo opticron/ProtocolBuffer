@@ -15,6 +15,14 @@ version(D_Version2) {
 	import std.algorithm;
 	import std.range;
 	import std.regex;
+	version(unittest) {
+		PBMessage PBCompileTime(ParserData pbstring) {
+			return PBMessage(pbstring);
+		}
+		PBEnum PBCTEnum(ParserData pbstring) {
+			return PBEnum(pbstring);
+		}
+	}
 } else
 	import ProtocolBuffer.d1support;
 
@@ -126,13 +134,10 @@ private string constructUndecided(PBChild child, int indentCount, string tname) 
 		ret ~= indented(indentCount)~"   "~type~".Deserialize(input,false);\n";
 		ret ~= indented(--indentCount)~
 			"} else static if (is("~type~" == enum)) {\n";
-		ret ~= indented(++indentCount) ~
-			"if(wireType != WireType.varint)\n";
-		ret ~= constructMismatchException(type, indentCount+1);
 
 		// worry about packedness here
-		ret ~= indented(indentCount++)~"if (wireType == WireType.varint) {\n";
-		ret ~= indented(indentCount)~tname~"\n";
+		ret ~= indented(++indentCount)~"if (wireType == WireType.varint) {\n";
+		ret ~= indented(++indentCount)~tname~"\n";
 		ret ~= indented(indentCount)~"   cast("~toDType(type)~")\n";
 		ret ~= indented(indentCount)~"   fromVarint!(int)(input);\n";
 		if (modifier == "repeated") {
@@ -140,11 +145,9 @@ private string constructUndecided(PBChild child, int indentCount, string tname) 
 			ret ~= indented(++indentCount)~tname~"\n";
 			ret ~= indented(indentCount)~"   fromPacked!("~toDType(type)~
 				",fromVarint!(int))(input);\n";
-			ret ~= indented(indentCount)~tname~"\n";
-			ret ~= indented(indentCount)~"   fromPacked!("~toDType(type)~
-				",fromVarint!(int))(input);\n";
 		}
-		ret ~= indented(--indentCount)~"}\n";
+		ret ~= indented(--indentCount)~"} else\n";
+		ret ~= constructMismatchException(type, indentCount+1);
 		ret ~= indented(--indentCount)~"} else\n";
 		ret ~= indented(indentCount+1) ~ "static assert(0,\n";
 		ret ~= indented(indentCount+1) ~
@@ -612,10 +615,6 @@ unittest {
 
 version(D_Version2)
 unittest {
-    PBMessage PBCompileTime(ParserData pbstring) {
-        return PBMessage(pbstring);
-    }
-
 	// Conversion for repated packed
 	mixin(`enum str = ParserData("message Test4 {
 								 repeated int32 d = 4 [packed=true]; }");`);
@@ -636,10 +635,6 @@ unittest {
 
 version(D_Version2)
 unittest {
-	PBMessage PBCompileTime(ParserData pbstring) {
-		return PBMessage(pbstring);
-	}
-
 	// Conversion for repated packed
 	mixin(`enum str = ParserData("message Test2 {
 								 required string b = 2; }");`);
@@ -657,10 +652,6 @@ unittest {
 
 version(D_Version2)
 unittest {
-	PBMessage PBCompileTime(ParserData pbstring) {
-		return PBMessage(pbstring);
-	}
-
 	// Conversion for repated packed
 	mixin(`enum str = ParserData("message Test2 {
 								 repeated string b = 2; }");`);
@@ -678,10 +669,6 @@ unittest {
 
 version(D_Version2)
 unittest {
-	PBMessage PBCompileTime(ParserData pbstring) {
-		return PBMessage(pbstring);
-	}
-
 	// Conversion for repated packed
 	mixin(`enum str = ParserData("message Test2 {
 	                              repeated string b = 2;
@@ -698,4 +685,25 @@ unittest {
 	auto t2 = Test2(feed, false);
 	assert(t2.b == ["testing"]);
 	assert(t2.Serialize() == feedans[1..$-2]);
+}
+
+version(D_Version2)
+unittest {
+	// Conversion for repated packed
+	mixin(`enum um = ParserData("enum MyNum {
+	                              YES = 1; NO = 2; }");`);
+	mixin(`enum str = ParserData("message Test {
+	                              repeated MyNum b = 2 [packed=true]; }");`);
+	mixin(`enum msg = PBCompileTime(str);`);
+	mixin(`enum yum = PBCTEnum(um);`);
+	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import std.typecons;`);
+	mixin(yum.toD);
+	mixin("static " ~ msg.toD);
+	ubyte[] feed = [(2<<3) | 2,0x02,
+		0x01,0x02
+			];
+	auto t = Test(feed);
+	assert(t.b == [MyNum.YES, MyNum.NO]);
+	assert(t.Serialize() == feed);
 }
