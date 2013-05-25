@@ -617,7 +617,7 @@ version(D_Version2)
 unittest {
 	// Conversion for repated packed
 	mixin(`enum str = ParserData("message Test4 {
-								 repeated int32 d = 4 [packed=true]; }");`);
+	                              repeated int32 d = 4 [packed=true]; }");`);
 	mixin(`enum msg = PBCompileTime(str);`);
 	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
 	mixin(`import std.typecons;`);
@@ -635,9 +635,9 @@ unittest {
 
 version(D_Version2)
 unittest {
-	// Conversion for repated packed
+	// Conversion for string
 	mixin(`enum str = ParserData("message Test2 {
-								 required string b = 2; }");`);
+	                              required string b = 2; }");`);
 	mixin(`enum msg = PBCompileTime(str);`);
 	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
 	mixin(`import std.typecons;`);
@@ -652,24 +652,7 @@ unittest {
 
 version(D_Version2)
 unittest {
-	// Conversion for repated packed
-	mixin(`enum str = ParserData("message Test2 {
-								 repeated string b = 2; }");`);
-	mixin(`enum msg = PBCompileTime(str);`);
-	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
-	mixin(`import std.typecons;`);
-	mixin("static " ~ msg.toD);
-	ubyte[] feed = [0x12,0x07, // (tag 2, type 2) (length 7)
-		0x74,0x65,0x73,0x74,0x69,0x6e,0x67
-			]; // From example
-	auto t2 = Test2(feed);
-	assert(t2.b == ["testing"]);
-	assert(t2.Serialize() == feed);
-}
-
-version(D_Version2)
-unittest {
-	// Conversion for repated packed
+	// Tests parsing does not pass message
 	mixin(`enum str = ParserData("message Test2 {
 	                              repeated string b = 2;
 	                              repeated string c = 3; }");`);
@@ -689,7 +672,7 @@ unittest {
 
 version(D_Version2)
 unittest {
-	// Conversion for repated packed
+	// Packed enum data
 	mixin(`enum um = ParserData("enum MyNum {
 	                              YES = 1; NO = 2; }");`);
 	mixin(`enum str = ParserData("message Test {
@@ -706,4 +689,30 @@ unittest {
 	auto t = Test(feed);
 	assert(t.b == [MyNum.YES, MyNum.NO]);
 	assert(t.Serialize() == feed);
+}
+
+version(D_Version2)
+unittest {
+	// Type Generation
+	mixin(`enum one = ParserData("enum Settings {
+	                              FOO = 1;
+	                              BAR = 2;
+	                          }");`);
+	mixin(`enum two = ParserData("message Type {
+	                              repeated int32 data = 1;
+	                              repeated int32 extra = 2 [packed = true];
+	                              optional int32 last = 3;
+	                          }");`);
+	mixin(`enum three = ParserData("message OtherType {
+	                              optional Type t = 1;
+	                              repeated Settings set = 2 [packed = true];
+	                          }");`);
+	mixin(`enum ichi = PBCTEnum(one);`);
+	mixin(`enum ni = PBCompileTime(two);`);
+	mixin(`enum san = PBCompileTime(three);`);
+	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import std.typecons;`);
+	mixin(ichi.toD);
+	mixin("static " ~ ni.toD);
+	mixin("static " ~ san.toD);
 }
