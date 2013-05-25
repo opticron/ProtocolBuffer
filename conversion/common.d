@@ -25,6 +25,10 @@ string indented(int indentCount) {
 
 enum Indent { none, open, close = 4 }
 
+struct Memory {
+	private CodeBuilder.Operation[][string] saved;
+}
+
 struct CodeBuilder {
 	struct Operation {
 		string text;
@@ -119,6 +123,16 @@ struct CodeBuilder {
 	void saveBuild(string name) {
 		saved[name] = store;
 		store = null;
+	}
+
+	Memory mem() {
+		Memory m;
+		m.saved = saved;
+		return m;
+	}
+
+	void mem(Memory m) {
+		saved = m.saved;
 	}
 
 	string finalize() {

@@ -116,8 +116,9 @@ private string constructMismatchException(string type, int indentCount) {
 	return code.finalize();
 }
 
-private string constructUndecided(PBChild child, int indentCount, string tname) {
+private string constructUndecided(PBChild child, int indentCount, Memory mem) {
 	auto code = CodeBuilder(indentCount);
+	code.mem(mem);
 	// this covers enums and classes,
 	// since enums are declared as classes
 	// also, make sure we don't think we're root
@@ -134,7 +135,8 @@ private string constructUndecided(PBChild child, int indentCount, string tname) 
 		code.put(null, Indent.close);
 
 		// no need to worry about packedness here, since it can't be
-		code.put(tname~" "~type~".Deserialize(input,false);\n");
+		code.putBuild("tname");
+		code.rawPut(" "~type~".Deserialize(input,false);\n");
 		code.put("} else static if (is("~type~" == enum)) {\n",
 		      Indent.close | Indent.open);
 
@@ -145,12 +147,14 @@ private string constructUndecided(PBChild child, int indentCount, string tname) 
 		code.build(null, Indent.close);
 		code.pushBuild();
 
-		code.put(tname~" cast("~toDType(type)~")\n");
+		code.putBuild("tname");
+		code.rawPut(" cast("~toDType(type)~")\n");
 		code.put("   fromVarint!(int)(input);\n");
 		if (modifier == "repeated") {
 			code.put("} else if (wireType == WireType.lenDelimited) {\n",
 			       Indent.close | Indent.open);
-			code.put(tname~"\n");
+			code.putBuild("tname");
+			code.rawPut("\n");
 			code.put("   fromPacked!("~toDType(type)~
 				",fromVarint!(int))(input);\n");
 		}
@@ -169,17 +173,21 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 		if(isReserved(tname)) {
 			tname = tname ~ "_";
 		}
-		if (modifier == "repeated")
-			tname = tname ~ " = new "~toDType(type)~"[](0); " ~ tname ~ " ~=";
-		else
-			tname = tname ~ " =";
+		code.build(tname);
+		if (modifier == "repeated") {
+			code.buildRaw(" = new "~toDType(type)~"[](0);\n");
+			code.build(tname ~ " ~=");
+		} else
+			code.buildRaw(" =");
+		code.saveBuild("tname");
+
 		// check header ubyte with case since we're guaranteed to be in a switch
 		code.put("case "~to!(string)(index)~":\n", Indent.open);
 		code.push("break;\n");
 
 		// Class and Enum will have an undecided type
 		if(wTFromType(type) == WireType.undecided) {
-			code.rawPut(constructUndecided(child, code.indentCount, tname));
+			code.rawPut(constructUndecided(child, code.indentCount, code.mem));
 			return code.finalize();
 		}
 
@@ -212,7 +220,8 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 			break;
 		case "string","bytes":
 			// no need to worry about packedness here, since it can't be
-			code.put(tname ~ "\n");
+			code.putBuild("tname");
+			code.rawPut("\n");
 			code.put("   fromByteString!("~toDType(type)~")(input);\n");
 			return code.finalize();
 		default:
@@ -221,14 +230,16 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 
 		if(packed) {
 			code.put("if (wireType == WireType.lenDelimited) {\n", Indent.open);
-			code.put(tname ~ "\n");
+			code.putBuild("tname");
+			code.rawPut("\n");
 			code.put("   fromPacked!("~toDType(type)~","~pack~")(input);\n");
 			code.put("//Accept data even when not packed\n");
 			code.put("} else {\n", Indent.close | Indent.open);
 			code.push("}\n");
 		}
 
-		code.put(tname ~ "\n");
+		code.putBuild("tname");
+		code.rawPut("\n");
 		code.put("   " ~ pack ~ "(input);\n");
 		return code.finalize();
 	}
