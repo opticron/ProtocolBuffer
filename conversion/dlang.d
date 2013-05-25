@@ -364,10 +364,10 @@ unittest {
 r"\t\w{3,6} = \d,\n" ~
 r"\t\w{3,6} = \d,\n" ~
 r"\t\w{3,6} = \d,\n\}");
-    assert(!enm.toD.match(ans).empty);
-    assert(!enm.toD.find(r"TOTALS = 1").empty);
-    assert(!enm.toD.find(r"ALL = 3").empty);
-    assert(!enm.toD.find(r"JUNK = 5").empty);
+	assert(!enm.toD.match(ans).empty);
+	assert(!enm.toD.find(r"TOTALS = 1").empty);
+	assert(!enm.toD.find(r"ALL = 3").empty);
+	assert(!enm.toD.find(r"JUNK = 5").empty);
 
 	// Conversion for commented, indented
 	str = ParserData("enum potato {\n// The total\nTOTALS = 1;}");
@@ -378,7 +378,7 @@ r"\tenum potato \{\n" ~
 r"\t\t/// The total\n" ~
 r"\t\tTOTALS = \d,\n" ~
 r"\t\}");
-    assert(!enm.toD(1).match(ans).empty);
+	assert(!enm.toD(1).match(ans).empty);
 }
 
 string genDes(PBMessage msg, int indentCount = 0) {
@@ -486,14 +486,14 @@ string genMerge(PBMessage msg, int indentCount = 0) {
 			auto field = pbchild.name;
 			if(isReserved(field))
 				field = pbchild.name ~ "_";
-            if (pbchild.modifier != "repeated") {
+			if (pbchild.modifier != "repeated") {
 			ret ~= indent~"if (!merger."~field~".isNull) "~
-                field~" = merger."~field~";\n";
-            } else {
-                ret ~= indent~"if (!merger."~field~".isNull) "~
-                    field~" ~= merger."~field~";\n";
-            }
-        }
+				field~" = merger."~field~";\n";
+			} else {
+				ret ~= indent~"if (!merger."~field~".isNull) "~
+					field~" ~= merger."~field~";\n";
+			}
+		}
 		indent = indented(--indentCount);
 		ret ~= indent~"}\n";
 		return ret;
@@ -589,10 +589,6 @@ unittest {
 
 version(D_Version2)
 unittest {
-    PBMessage PBCompileTime(ParserData pbstring) {
-        return PBMessage(pbstring);
-    }
-
 	// Conversion for optional
 	mixin(`enum str = ParserData("message Test1 { required int32 a = 1; }");`);
 	mixin(`enum msg = PBCompileTime(str);`);
@@ -609,7 +605,7 @@ version(D_Version2)
 unittest {
 	auto str = ParserData("optional OtherType type = 1;");
 	auto ms = PBChild(str);
-    toD(ms);
+	toD(ms);
 }
 
 version(D_Version2)
