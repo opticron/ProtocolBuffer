@@ -297,7 +297,7 @@ ubyte[]ripUField(ref ubyte[]input,int wiretype) {
 		// shit is broken....
 		throw new Exception("Can't deal with wiretype "~to!(string)(wiretype));
 	}
-	throw new Exception("Wiretype "~to!(string)(wiretype)~" fell through switch");
+	assert(0);
 }
 
 // handle packed fields
