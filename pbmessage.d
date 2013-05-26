@@ -142,21 +142,6 @@ struct PBMessage {
 		return message;
 	}
 
-	string genMergeCode(string indent) {
-		string ret;
-		ret ~= indent~"void MergeFrom("~name~" merger) {\n";
-		indent = indent~"	";
-		// merge code
-		foreach(pbchild;children) if (pbchild.modifier != "repeated") {
-			ret ~= indent~"if (merger.has_"~pbchild.name~") "~pbchild.name~" = merger."~pbchild.name~";\n";
-		} else {
-			ret ~= indent~"if (merger.has_"~pbchild.name~") add_"~pbchild.name~"(merger."~pbchild.name~");\n";
-		}
-		indent = indent[0..$-1];
-		ret ~= indent~"}\n";
-		return ret;
-	}
-
 	void ripExtenRange(ref ParserData pbstring) {
 		pbstring = pbstring["extensions".length..pbstring.length];
 		pbstring = stripLWhite(pbstring);
