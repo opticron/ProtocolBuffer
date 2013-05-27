@@ -256,7 +256,6 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 		code.rawPut(to!(string)(index));
 		code.rawPut(" Field Name " ~ name ~ "\n");
 
-
 		// Class and Enum will have an undecided type
 		if(wTFromType(type) == WireType.undecided) {
 			code.rawPut(constructUndecided(child, indentCount, code.mem));
@@ -416,15 +415,15 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			code.rawPut(")\n", Indent.open);
 			code.put("ret ~= toPacked!("~packType~"[],"~func~")");
 			code.put(Indent.close);
-		} else {
-			if (modifier != "required") {
-				code.put("if (has_");
-				code.putBuild("funName");
-				code.rawPut(") ");
-			} else
-				code.put(""); // Adds indenting
+		} else if (modifier != "required" && modifier != "repeated") {
+			code.put("if (has_");
+			code.putBuild("funName");
+			code.rawPut(") ");
+		} else
+			code.put(""); // Adds indenting
+
+		if(!packed)
 			code.rawPut("ret ~= "~func);
-		}
 		// finish off the parameters, because they're the same for packed or not
 		if(customType) {
 			if(packed)
@@ -803,9 +802,12 @@ unittest {
 	                              optional int32 last = 3;
 	                          }");`);
 	mixin(`enum three = ParserData("message OtherType {
-	                              optional Type struc = 1;
-	                              repeated Settings eum = 2 [packed = true];
+	                              optional Type struct = 1;
+	                              repeated Settings enum = 2 [packed = true];
 	                              repeated Settings num = 3;
+	                              repeated string a = 4;
+	                              required string b = 5;
+	                              repeated Type t = 6;
 	                          }");`);
 	mixin(`enum ichi = PBCTEnum(one);`);
 	mixin(`enum ni = PBCompileTime(two);`);
@@ -815,6 +817,35 @@ unittest {
 	mixin(ichi.toD1);
 	mixin("static " ~ ni.toD1);
 	mixin("static " ~ san.toD1);
+	ubyte[] feed = [((1 << 3) | 2), 8, // OtherType.Type
+	((1 << 3) | 0), 1, ((1 << 3) | 0), 2, // Type.Data
+	((2 << 3) | 2), 2, 3, 4, // Type.Extra
+
+	((2 << 3) | 2), 1, 1, // OtherType.enum
+	((3 << 3) | 0), 2, // OtherType.num
+	((4 << 3) | 2), 1, 'a', // OtherType.a
+	((4 << 3) | 2), 1, 'b', // OtherType.a
+	((5 << 3) | 2), 2, 'c', 'd', // OtherType.b
+
+	((6 << 3) | 2), 4, // OtherType.Type
+	((1 << 3) | 0), 2, // Type.Data
+	((1 << 3) | 0), 2, // Type.Data
+	((6 << 3) | 2), 2, // OtherType.Type
+	((1 << 3) | 0), 3, // Type.Data
+	];
+	auto ot = new OtherType(feed);
+	assert(ot.struct_.data == [1, 2]);
+	assert(ot.struct_.extra == [3, 4]);
+	assert(ot.enum_ == [Settings.FOO]);
+	assert(ot.num == [Settings.BAR]);
+	assert(ot.a == ["a", "b"]);
+	assert(ot.b == "cd");
+	assert(ot.t[0].data == [2,2]);
+	assert(ot.t[1].data == [3]);
+	assert(ot.t.length == 2);
+
+	auto res = ot.Serialize();
+	assert(res == feed);
 }
 
 version(D_Version2)

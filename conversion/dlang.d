@@ -173,17 +173,26 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 		if(isReserved(tname)) {
 			tname = tname ~ "_";
 		}
-		code.build(tname);
 		if (modifier == "repeated") {
+			code.build("if(");
+			code.buildRaw(tname);
+			code.buildRaw(".isNull) ");
+			code.buildRaw(tname);
 			code.buildRaw(" = new "~toDType(type)~"[](0);\n");
 			code.build(tname ~ " ~=");
-		} else
+		} else {
+			code.build(tname);
 			code.buildRaw(" =");
+		}
 		code.saveBuild("tname");
 
 		// check header ubyte with case since we're guaranteed to be in a switch
-		code.put("case "~to!(string)(index)~":\n", Indent.open);
+		code.put("case "~to!(string)(index)~":", Indent.open);
 		code.push("break;\n");
+
+		code.rawPut("// Deserialize member ");
+		code.rawPut(to!(string)(index));
+		code.rawPut(" Field Name " ~ name ~ "\n");
 
 		// Class and Enum will have an undecided type
 		if(wTFromType(type) == WireType.undecided) {
@@ -242,8 +251,8 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 		}
 
 		code.putBuild("tname");
-		code.rawPut("\n");
-		code.put("   " ~ pack ~ "(input);\n");
+		code.rawPut(" ");
+		code.rawPut(pack ~ "(input);\n");
 		return code.finalize();
 	}
 }
@@ -253,18 +262,10 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 	with(child) {
 		if(type == "group")
 			throw new Exception("Group type not supported");
+		code.put("// Serialize member ");
+		code.rawPut(to!(string)(index));
+		code.rawPut(" Field Name " ~ name ~ "\n");
 
-		string tname = name;
-		if (is_exten) tname = "__exten"~tname;
-		if (modifier == "repeated" && !packed) {
-			code.put("if(!"~tname~".isNull)\n");
-			code.put("foreach(iter;"~tname~".get()) {\n", Indent.open);
-			code.push("}\n");
-			tname = "iter";
-		}
-		if(isReserved(tname)) {
-			tname = tname ~ "_";
-		}
 		string func;
 		bool customType = false;
 		switch(type) {
@@ -287,23 +288,52 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			customType = true;
 			break;
 		}
-		// we have to have some specialized code to deal with enums vs user-defined classes, since they are both detected the same
+		auto tname = name;
+		if (is_exten) tname = "__exten" ~ name;
+		code.buildRaw(tname);
+		code.saveBuild("funName");
+
+		if(isReserved((is_exten?"__exten":"") ~ name))
+			tname ~= "_";
+		code.buildRaw(tname);
+		code.saveBuild("tname");
+
+		if (modifier == "repeated" && !packed) {
+			code.put("if(!"~tname~".isNull)\n");
+			code.put("foreach(iter;");
+			code.putBuild("tname");
+			code.rawPut(".get()) {\n", Indent.open);
+			code.push("}\n");
+			code.buildRaw("iter");
+			code.saveBuild("tname");
+		}
+
+		// we have to have some specialized code to deal with enums vs
+		// user-defined classes, since they are both detected the same
 		if (customType) {
 			code.put("static if (is("~type~" == struct)) {\n", Indent.open);
 			code.build("} else\n", Indent.close | Indent.open);
-			code.build("static assert(0,\"Can't identify type `"
-				~ type ~ "`\");\n\n");;
-			code.build(null, Indent.close);
+			code.build("static assert(0,\"Can't identify type `");
+			code.buildRaw(type ~ "`\");\n");;
+			code.build(Indent.close);
 			code.pushBuild();
-			// packed only works for primitive types, so take care of normal repeated serialization here
-			// since we can't easily detect this without decent type resolution in the .proto parser
+			// packed only works for primitive types, so take care of normal
+			// repeated serialization here since we can't easily detect this
+			// without decent type resolution in the .proto parser
 			if (packed) {
 				assert(modifier == "repeated");
-				code.put("foreach(iter;"~name~") {\n", Indent.open);
+				code.put("foreach(iter;");
+				code.putBuild("tname");
+				code.put(") {\n", Indent.open);
 				code.push("}\n");
 			}
-			code.put("ret ~= "~(packed?"iter":tname)~
-			         ".Serialize("~to!(string)(index)~");\n");
+			code.put("ret ~= ");
+			if (packed)
+				code.rawPut("iter");
+			else
+				code.putBuild("tname");
+			code.rawPut(".Serialize("~to!(string)(index)~");\n");
+
 			if (packed)
 				code.pop();
 			// done taking care of unpackable classes
@@ -316,21 +346,39 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			auto packType = toDType(type);
 			if(customType)
 				packType = "int";
-			code.put("if(!"~tname~".isNull)\n", Indent.open);
+			code.put("if(!");
+			code.putBuild("tname");
+			code.rawPut(".isNull)\n", Indent.open);
 			code.put("ret ~= toPacked!("~packType~"[],"~func~")");
 			code.put(Indent.close);
-		} else if (modifier != "repeated" && modifier != "required") {
-			code.put("if (!"~tname~".isNull) ret ~= "~func);
+		} else if (modifier != "required" && modifier != "repeated") {
+			code.put("if (!");
+			code.putBuild("tname");
+			code.rawPut(".isNull) ");
 		} else
-			code.put("ret ~= "~func);
+			code.put(""); // Adds indenting
 
+		if(!packed)
+			code.rawPut("ret ~= "~func);
 		// finish off the parameters, because they're the same for packed or not
-		if(tname != "iter") {
-			if(packed && customType)
-				tname = "cast(int[])" ~ tname;
-			tname = tname ~ ".get()";
-		}
-		code.rawPut("("~tname~","~to!(string)(index)~");\n");
+		// finish off the parameters, because they're the same for packed or not
+		if(customType) {
+			if(packed)
+				code.rawPut("(cast(int[])");
+			else
+				code.rawPut("(cast(int)");
+		} else
+			code.rawPut("(");
+
+		if(modifier != "repeated" && !packed)
+			code.rawPush(".get(),", Indent.none);
+		else
+			code.rawPush(",", Indent.none);
+
+		code.putBuild("tname");
+		code.pop();
+		code.rawPut(to!(string)(index)~");\n");
+
 	}
 	return code.finalize();
 }
@@ -701,8 +749,12 @@ unittest {
 	                              optional int32 last = 3;
 	                          }");`);
 	mixin(`enum three = ParserData("message OtherType {
-	                              optional Type t = 1;
-	                              repeated Settings set = 2 [packed = true];
+	                              optional Type struct = 1;
+	                              repeated Settings enum = 2 [packed = true];
+	                              repeated Settings num = 3;
+	                              repeated string a = 4;
+	                              required string b = 5;
+	                              repeated Type t = 6;
 	                          }");`);
 	mixin(`enum ichi = PBCTEnum(one);`);
 	mixin(`enum ni = PBCompileTime(two);`);
@@ -712,4 +764,33 @@ unittest {
 	mixin(ichi.toD);
 	mixin("static " ~ ni.toD);
 	mixin("static " ~ san.toD);
+	ubyte[] feed = [((1 << 3) | 2), 8, // OtherType.Type
+	((1 << 3) | 0), 1, ((1 << 3) | 0), 2, // Type.Data
+	((2 << 3) | 2), 2, 3, 4, // Type.Extra
+
+	((2 << 3) | 2), 1, 1, // OtherType.enum
+	((3 << 3) | 0), 2, // OtherType.num
+	((4 << 3) | 2), 1, 'a', // OtherType.a
+	((4 << 3) | 2), 1, 'b', // OtherType.a
+	((5 << 3) | 2), 2, 'c', 'd', // OtherType.b
+
+	((6 << 3) | 2), 4, // OtherType.Type
+	((1 << 3) | 0), 2, // Type.Data
+	((1 << 3) | 0), 2, // Type.Data
+	((6 << 3) | 2), 2, // OtherType.Type
+	((1 << 3) | 0), 3, // Type.Data
+	];
+	auto ot = new OtherType(feed);
+	assert(ot.struct_.data == [1, 2]);
+	assert(ot.struct_.extra == [3, 4]);
+	assert(ot.enum_ == [Settings.FOO]);
+	assert(ot.num == [Settings.BAR]);
+	assert(ot.a == ["a", "b"]);
+	assert(ot.b == "cd");
+	assert(ot.t[0].data == [2,2]);
+	assert(ot.t[1].data == [3]);
+	assert(ot.t.length == 2);
+
+	auto res = ot.Serialize();
+	assert(res == feed);
 }
