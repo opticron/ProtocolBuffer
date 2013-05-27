@@ -127,12 +127,12 @@ private string constructUndecided(PBChild child, int indentCount, Memory mem) {
 		code.build("} else\n", Indent.close | Indent.open);
 		code.build("static assert(0,\n");
 		code.build("  \"Can't identify type `" ~ type ~ "`\");\n");
-		code.build(null, Indent.close);
+		code.build(Indent.close);
 		code.pushBuild();
 
 		code.put("if(wireType != WireType.lenDelimited)\n", Indent.open);
 		code.rawPut(constructMismatchException(type, code.indentCount));
-		code.put(null, Indent.close);
+		code.put(Indent.close);
 
 		// no need to worry about packedness here, since it can't be
 		code.putBuild("tname");
@@ -144,7 +144,7 @@ private string constructUndecided(PBChild child, int indentCount, Memory mem) {
 		code.put("if (wireType == WireType.varint) {\n", Indent.open);
 		code.build("} else\n", Indent.close | Indent.open);
 		code.buildRaw(constructMismatchException(type, code.indentCount));
-		code.build(null, Indent.close);
+		code.build(Indent.close);
 		code.pushBuild();
 
 		code.putBuild("tname");
@@ -197,7 +197,7 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 			assert(isPackable(type));
 			// Allow reading data even when not packed
 			code.put("if (wireType != WireType.lenDelimited)\n", Indent.open);
-			code.push(null, Indent.close);
+			code.push(Indent.close);
 		}
 
 		// Verify wire type is expected type else
@@ -205,7 +205,10 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 		code.put("if (wireType != WireType." ~
 			to!(string)(wTFromType(type))~")\n", Indent.open);
 		code.rawPut(constructMismatchException(type, code.indentCount));
-		code.put(null, Indent.close);
+		code.put(Indent.close);
+
+		if (packed)
+			code.pop();
 
 		string pack;
 		switch(type) {
@@ -335,25 +338,24 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 /**
  */
 string toD(PBEnum child, int indentCount = 0) {
-	auto indent = indented(indentCount);
-	string ret = "";
+	auto code = CodeBuilder(indentCount);
 	with(child) {
 		// Apply comments to enum
 		foreach(c; comments)
-			ret ~= indent ~ (c.empty()? "":"/") ~ c ~ "\n";
+			code.put((c.empty() ? "":"/") ~ c ~ "\n");
 
-		ret ~= indent~"enum "~name~" {\n";
+		code.put("enum "~name~" {\n", Indent.open);
+		code.push("}\n");
 		foreach (key, value; values) {
 			// Apply comments to field
 			if(key in valueComments)
 				foreach(c; valueComments[key])
-					ret ~= indent ~ "\t/" ~ c ~ "\n";
+					code.put("/" ~ c ~ "\n");
 
-			ret ~= indent~"\t"~value~" = "~to!(string)(key)~",\n";
+			code.put(value~" = "~to!(string)(key)~",\n");
 		}
-		ret ~= indent~"}";
 	}
-	return ret;
+	return code.finalize();
 }
 
 version(D_Version2)

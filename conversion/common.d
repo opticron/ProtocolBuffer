@@ -17,6 +17,7 @@ version(D_Version2) {
  * Converts a numeric to an indent string
  */
 string indented(int indentCount) {
+    assert(indentCount > -1);
 	version(D_Version2)
 		return to!(string)(repeat("\t", indentCount).join.array);
 	else
@@ -79,8 +80,16 @@ struct CodeBuilder {
 		lower ~= [Operation(str, indent)];
 	}
 
+	void push(Indent indent) {
+		lower ~= [Operation(null, indent)];
+	}
+
 	void rawPush(string str, Indent indent = Indent.close) {
 		lower ~= [Operation(str, indent, true)];
+	}
+
+	void rawPush() {
+		lower ~= [Operation(null, Indent.none, true)];
 	}
 
 	void pop() {
@@ -99,6 +108,10 @@ struct CodeBuilder {
 
 	void build(string str, Indent indent = Indent.none) {
 		store ~= Operation(str, indent);
+	}
+
+	void build(Indent indent) {
+		store ~= Operation(null, indent);
 	}
 
 	void buildRaw(string str, Indent indent = Indent.none) {
