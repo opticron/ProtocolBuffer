@@ -1,33 +1,58 @@
 module pbcompiler;
 // compiler for .proto protocol buffer definition files that generates D code
+//
 import ProtocolBuffer.pbroot;
 import ProtocolBuffer.pbextension;
 import ProtocolBuffer.pbmessage;
 import ProtocolBuffer.pbgeneral;
+
+import std.conv;
 import std.file;
-import std.string;
 import std.path;
 import std.stdio;
-// our tree of roots to play with, so that we can apply multiple extensions to a given document
-PBRoot[char[]]docroots;
+import std.string;
 
-int main(char[][]args) {
+version(D_Version2) {
+	import std.getopt;
+	import std.algorithm;
+} else
+	import ProtocolBuffer.d1support;
+
+// our tree of roots to play with, so that we can apply multiple extensions to a given document
+PBRoot[string] docroots;
+
+enum Language {
+	D1,
+	D2,
+}
+
+int main(string[] args) {
+	version(D_Version2) {
+		Language lang = Language.D2;
+		getopt(args, config.passThrough,
+		       "lang", &lang
+		      );
+	} else
+		Language lang = Language.D1;
+
 	// rip off the first arg, because that's the name of the program
 	args = args[1..$];
+
 	if (!args.length) throw new Exception("No proto files supplied on the command line!");
+
 	foreach (arg;args) {
 		readRoot(arg);
 	}
 	applyExtensions();
-	writeRoots();
+	writeRoots(lang);
 	return 0;
 }
 
 // returns package name
-char[]readRoot(char[]filename) {
-	char[]contents = cast(char[])read(filename);
+string readRoot(string filename) {
+	string contents = cast(string)read(filename);
 	auto root = PBRoot(contents);
-	char[]fname = root.Package;
+	string fname = root.Package;
 	if (!fname.length) {
 		if (filename.length>6 && filename[$-6..$].icmp(".proto") == 0) {
 			fname = filename[0..$-6];
@@ -63,16 +88,11 @@ void applyExtensions() {
 
 // attempt to apply an individual extension to a node identifier
 // returns 1 if applied
-int applyExtension(char[]imp,PBExtension ext) {
+int applyExtension(string imp,PBExtension ext) {
 	writefln("Attempting to apply extension %s",ext.name);
-	char[]tmp = ext.name;
+	string tmp = ext.name;
 	bool impflag = false;
-	// attempt to match the import name to the beginning of the class name
-	if(imp == tmp[0..imp.length]) {
-		// we managed to match the front end, so rip it off along with the following comma
-		tmp = tmp[imp.length+1..$];
-		impflag = true;
-	}
+	tmp.skipOver(imp);
 	// now look for a message that matches the section within the current import
 	PBMessage*dst = imp.findMessage(tmp);
 	if (dst is null) {
@@ -90,11 +110,11 @@ int applyExtension(char[]imp,PBExtension ext) {
 				break;
 			}
 		}
-		if (!extmatch) throw new Exception("The field number "~toString(echild.index)~" for extension "~echild.name~" is not within a valid extension range for "~dst.name);
+		if (!extmatch) throw new Exception("The field number "~to!(string)(echild.index)~" for extension "~echild.name~" is not within a valid extension range for "~dst.name);
 	}
 	// now check each child vs each extension already applied to see if there are conflicts
 	foreach(dchild;dst.child_exten) foreach(echild;ext.children) {
-		if (dchild.index == echild.index) throw new Exception("Extensions "~dchild.name~" and "~echild.name~" to "~dst.name~" have identical index number "~toString(dchild.index));
+		if (dchild.index == echild.index) throw new Exception("Extensions "~dchild.name~" and "~echild.name~" to "~dst.name~" have identical index number "~to!(string)(dchild.index));
 	}
 	// it looks like we have a match!
 	writefln("Applying extensions to %s",dst.name);
@@ -103,19 +123,19 @@ int applyExtension(char[]imp,PBExtension ext) {
 }
 
 // this function digs through a given root to see if it has the message described by the dotstring
-PBMessage*findMessage(char[]impstr,char[]message) {
+PBMessage*findMessage(string impstr,string message) {
 	PBRoot root = docroots[impstr];
-	return searchMessages(root,message);
+	return searchMessages(root, ParserData(message));
 }
 
-PBMessage*searchMessages(T)(ref T root,char[]message)
+PBMessage*searchMessages(T)(ref T root, ParserData message)
 in {
 	assert(message.length);
 } body {
-	char[]name = stripValidChars(CClass.Identifier,message);
+	string name = stripValidChars(CClass.Identifier,message);
 	if (message.length) {
 		// rip off the leading .
-		message = message[1..$];
+		message = message[1..message.length];
 	}
 	// this is terminal, so run through the children to find a match
 	foreach(ref msg;root.message_defs) {
@@ -140,28 +160,39 @@ PBExtension[]getExtensions(T)(T root) {
 }
 
 // this is where all files are written, no real processing is done here
-void writeRoots() {
+void writeRoots(Language lang) {
 	foreach(root;docroots) {
-		char[]tmp;
+		string tmp;
 		tmp = "module "~root.Package~";\n";
 		// write out imports
 		foreach(imp;root.imports) {
 			tmp ~= "import "~imp~";\n";
 		}
-		tmp ~= root.toDString;
-		char[]fname = root.Package.tr(".","/")~".d";
-		char[]dname = fname.getDirName();
+		switch(lang) {
+			case Language.D1:
+				tmp ~= root.langD1();
+				break;
+			case Language.D2:
+				tmp ~= root.langD();
+				break;
+			default:
+				assert(false);
+		}
+		string fname = root.Package.tr(".","/")~".d";
+		version(D_Version2) string dname = fname.dirName();
+		else string dname = fname.getDirName();
 		// check to see if we need to create the directory
 		if (dname.length && !dname.exists()) {
 			dname.mkdirRecurse();
 		}
-		write(fname,tmp);
+		std.file.write(fname,tmp);
 	}
 }
 
-void mkdirRecurse(in char[] pathname)
+void mkdirRecurse(in string  pathname)
 {
-	char[]left = getDirName(pathname);
+	version(D_Version2) string left = dirName(pathname);
+	else string left = getDirName(pathname);
 	exists(left) || mkdirRecurse(left);
 	mkdir(pathname);
 }
