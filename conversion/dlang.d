@@ -15,6 +15,7 @@ version(D_Version2) {
 	import std.algorithm;
 	import std.range;
 	import std.regex;
+	mixin(`
 	version(unittest) {
 		PBMessage PBCompileTime(ParserData pbstring) {
 			return PBMessage(pbstring);
@@ -22,7 +23,7 @@ version(D_Version2) {
 		PBEnum PBCTEnum(ParserData pbstring) {
 			return PBEnum(pbstring);
 		}
-	}
+	}`);
 } else
 	import ProtocolBuffer.d1support;
 

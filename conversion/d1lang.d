@@ -15,6 +15,7 @@ version(D_Version2) {
 	import std.algorithm;
 	import std.range;
 	import std.regex;
+	mixin(`
 	version(unittest) {
 		import std.conv;
 		string makeString(T)(T v) {
@@ -26,7 +27,7 @@ version(D_Version2) {
 		PBEnum PBCTEnum(ParserData pbstring) {
 			return PBEnum(pbstring);
 		}
-    }
+    }`);
 
 } else
 	import ProtocolBuffer.d1support;
