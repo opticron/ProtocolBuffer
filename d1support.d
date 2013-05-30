@@ -19,6 +19,15 @@ version(D_Version2) {
     bool empty(T)(T[] v) {
         return !v.length;
     }
+
+    T back(T)(T[] arr) {
+        return arr[$-1];
+    }
+
+    void popBack(T)(ref T[] arr) {
+        arr = arr[0..$-1];
+    }
+
     bool skipOver(ref string str, string c) {
         if(str[0..c.length] == c) {
             str = str[c.length..$];

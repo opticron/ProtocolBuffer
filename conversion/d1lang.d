@@ -51,65 +51,72 @@ private string typeWrapper(PBChild child) {
 /**
  */
 string toD1(PBChild child, int indentCount = 0) {
-	string ret;
-	auto indent = indented(indentCount);
+	auto code = CodeBuilder(indentCount);
 	with(child) {
-		ret ~= indent~toDType(type)~(modifier=="repeated"?"[]_":" _")~
-			name~(valdefault.length?" = "~valdefault:"")~";\n";
+		code.put(toDType(type)~(modifier=="repeated"?"[]_":" _")~
+			name~(valdefault.length?" = "~valdefault:"")~";\n");
 
 		foreach(c; comments)
-			ret ~= indent ~ (c.empty() ? "":"/") ~ c ~ "\n";
+			code.put((c.empty() ? "":"/") ~ c ~ "\n");
 		if(comments.empty())
-			ret ~= indent ~ "///\n";
+			code.put("///\n");
 		auto fieldName = name;
 		if(isReserved(fieldName))
 			fieldName = name ~ "_";
 		// get accessor
-		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~fieldName~"() {\n";
-		ret ~= indent~"	return _"~name~";\n";
-		ret ~= indent~"}\n";
+		code.put((is_dep?"deprecated ":"")~toDType(type)~(modifier==
+		         "repeated"?"[]":" ")~fieldName~"() {\n", Indent.open);
+		code.put("return _"~name~";\n");
+		code.put("}\n", Indent.close);
 
 		if(!comments.empty())
-			ret ~= indent ~ "/// ditto\n";
+			code.put("/// ditto\n");
 		else
-			ret ~= indent ~ "///\n";
+			code.put("///\n");
 		// set accessor
-		ret ~= indent~(is_dep?"deprecated ":"")~"void "~fieldName~
-			"("~toDType(type)~(modifier=="repeated"?"[]":" ")~"input_var) {\n";
-		ret ~= indent~"	_"~name~" = input_var;\n";
+		code.put((is_dep?"deprecated ":"")~"void "~fieldName~"("~toDType(type)~
+		         (modifier=="repeated"?"[]":" ")~"input_var) {\n", Indent.open);
+		code.put("_"~name~" = input_var;\n");
 
-		if (modifier != "repeated") ret ~= indent~"	_has_"~name~" = true;\n";
-		ret ~= indent~"}\n";
+		if (modifier != "repeated") code.put("_has_"~name~" = true;\n");
+		code.put("}\n", Indent.close);
 		if (modifier == "repeated") {
-			ret ~= indent~(is_dep?"deprecated ":"")~"bool has_"~name~" () {\n";
-			ret ~= indent~"	return _"~name~".length?1:0;\n";
-			ret ~= indent~"}\n";
-			ret ~= indent~(is_dep?"deprecated ":"")~"void clear_"~name~" () {\n";
-			ret ~= indent~"	_"~name~" = null;\n";
-			ret ~= indent~"}\n";
+			code.put((is_dep?"deprecated ":"")~"bool has_"~name~" () {\n",
+			         Indent.open);
+			code.put("return _"~name~".length?1:0;\n");
+			code.put("}\n", Indent.close);
+			code.put((is_dep?"deprecated ":"")~"void clear_"~name~" () {\n",
+			         Indent.open);
+			code.put("_"~name~" = null;\n");
+			code.put("}\n", Indent.close);
 			// technically, they can just do class.item.length
 			// there is no need for this
-			ret ~= indent~(is_dep?"deprecated ":"")~"size_t "~name~"_size () {\n";
-			ret ~= indent~"	return _"~name~".length;\n";
-			ret ~= indent~"}\n";
+			code.put((is_dep?"deprecated ":"")~"size_t "~name~"_size () {\n",
+			         Indent.open);
+			code.put("return _"~name~".length;\n");
+			code.put("}\n", Indent.close);
 			// functions to do additions, both singular and array
-			ret ~= indent~(is_dep?"deprecated ":"")~"void add_"~name~" ("~toDType(type)~" __addme) {\n";
-			ret ~= indent~"	_"~name~" ~= __addme;\n";
-			ret ~= indent~"}\n";
-			ret ~= indent~(is_dep?"deprecated ":"")~"void add_"~name~" ("~toDType(type)~"[]__addme) {\n";
-			ret ~= indent~"	_"~name~" ~= __addme;\n";
-			ret ~= indent~"}\n";
+			code.put((is_dep?"deprecated ":"")~"void add_"~name~" ("~
+			         toDType(type)~" __addme) {\n", Indent.open);
+			code.put("_"~name~" ~= __addme;\n");
+			code.put("}\n", Indent.close);
+			code.put((is_dep?"deprecated ":"")~"void add_"~name~" ("~
+			         toDType(type)~"[]__addme) {\n", Indent.open);
+			code.put("_"~name~" ~= __addme;\n");
+			code.put("}\n", Indent.close);
 		} else {
-			ret ~= indent~"bool _has_"~name~" = false;\n";
-			ret ~= indent~(is_dep?"deprecated ":"")~"bool has_"~name~" () {\n";
-			ret ~= indent~"	return _has_"~name~";\n";
-			ret ~= indent~"}\n";
-			ret ~= indent~(is_dep?"deprecated ":"")~"void clear_"~name~" () {\n";
-			ret ~= indent~"	_has_"~name~" = false;\n";
-			ret ~= indent~"}\n";
+			code.put("bool _has_"~name~" = false;\n");
+			code.put((is_dep?"deprecated ":"")~"bool has_"~name~" () {\n",
+			         Indent.open);
+			code.put("	return _has_"~name~";\n");
+			code.put("}\n", Indent.close);
+			code.put((is_dep?"deprecated ":"")~"void clear_"~name~" () {\n",
+			         Indent.open);
+			code.put("	_has_"~name~" = false;\n");
+			code.put("}\n", Indent.close);
 		}
-		return ret;
     }
+	return code.finalize();
 }
 
 version(D_Version2)
@@ -157,101 +164,123 @@ unittest {
 }
 
 private string constructMismatchException(string type, int indentCount) {
-	auto indent = indented(indentCount);
-	auto ret = indent ~ "throw new Exception(\"Invalid wiretype \" ~\n";
-		ret ~= indent ~ "   makeString(wireType) ~\n";
-		ret ~= indent ~ "   \" for variable type "~type~"\");\n\n";
-	return ret;
+	auto code = CodeBuilder(indentCount);
+	code.put("throw new Exception(\"Invalid wiretype \" ~\n");
+	code.put("   makeString(wireType) ~\n");
+	code.put("   \" for variable type "~type~"\");\n\n");
+	return code.finalize();
 }
 
-private string constructUndecided(PBChild child, int indentCount, string tname) {
-	string ret;
+private string constructUndecided(PBChild child, int indentCount, Memory mem) {
+	auto code = CodeBuilder(indentCount);
+	code.mem(mem);
 	// this covers enums and classes,
 	// since enums are declared as classes
 	// also, make sure we don't think we're root
 	with(child) {
-		ret ~= indented(indentCount++)~"static if (is("~type~":Object)) {\n";
-		ret ~= indented(indentCount) ~
-			"if(wireType != WireType.lenDelimited)\n";
-		ret ~= constructMismatchException(type, indentCount+1);
+		code.put("static if (is("~type~":Object)) {\n", Indent.open);
+		code.build("} else\n", Indent.close | Indent.open);
+		code.build("static assert(0,\n");
+		code.build("  \"Can't identify type `" ~ type ~ "`\");\n");
+		code.build(Indent.close);
+		code.pushBuild();
+
+		code.put("if(wireType != WireType.lenDelimited)\n", Indent.open);
+		code.rawPut(constructMismatchException(type, code.indentCount));
+		code.put(Indent.close);
 
 		// no need to worry about packedness here, since it can't be
-		if(modifier == "repeated") {
-			ret ~= indented(indentCount)~"add_"~tname~"(\n";
-			ret ~= indented(indentCount)~"   "~type~
-				".Deserialize(input,false));\n";
-		} else {
-			ret ~= indented(indentCount)~tname~" =\n";
-			ret ~= indented(indentCount)~"   "~type~
-				".Deserialize(input,false);\n";
-		}
-		ret ~= indented(--indentCount)~
-			"} else static if (is("~type~" == enum)) {\n";
+		code.putBuild("append_open");
+		code.rawPut(type~".Deserialize(input,false)");
+		code.putBuild("append_close");
+
+		code.put("} else static if (is("~type~" == enum)) {\n",
+		         Indent.close | Indent.open);
 
 		// worry about packedness here
-		ret ~= indented(++indentCount)~"if (wireType == WireType.varint) {\n";
-		if (modifier != "repeated") {
-			ret ~= indented(++indentCount)~tname~" =\n";
-			ret ~= indented(indentCount)~"   cast("~toDType(type)~")\n";
-			ret ~= indented(indentCount)~"   fromVarint!(int)(input);\n";
-		} else {
-			ret ~= indented(indentCount)~"add_"~tname~"(\n";
-			ret ~= indented(indentCount)~"   cast("~toDType(type)~")\n";
-			ret ~= indented(indentCount)~"   fromVarint!(int)(input));\n";
-			ret ~= indented(--indentCount)~"} else if (wireType == WireType.lenDelimited) {\n";
-			ret ~= indented(++indentCount)~tname~" =\n";
-			ret ~= indented(indentCount)~"   fromPacked!("~toDType(type)~
-				",fromVarint!(int))(input);\n";
+		code.put("if (wireType == WireType.varint) {\n", Indent.open);
+		code.build("} else\n", Indent.close | Indent.open);
+		code.buildRaw(constructMismatchException(type, code.indentCount));
+		code.build(Indent.close);
+		code.pushBuild();
+
+		code.putBuild("append_open");
+		code.rawPut("cast("~toDType(type)~")\n");
+		code.put("   fromVarint!(int)(input)");
+		code.putBuild("append_close");
+		if (modifier == "repeated") {
+			code.put("} else if (wireType == WireType.lenDelimited) {\n",
+			         Indent.close | Indent.open);
+			code.put("// Accept packed enum even if not specified as packed\n");
+			code.putBuild("tname");
+			code.rawPut("fromPacked!("~toDType(type));
+			code.rawPut(",fromVarint!(int))(input);\n");
 		}
-		ret ~= indented(--indentCount)~"} else\n";
-		ret ~= constructMismatchException(type, indentCount+1);
-		ret ~= indented(--indentCount)~"} else\n";
-		ret ~= indented(indentCount+1) ~ "static assert(0,\n";
-		ret ~= indented(indentCount+1) ~
-			"  \"Can't identify type `" ~ type ~ "`\");\n";
 	}
-	return ret;
+	return code.finalize();
 }
 
 string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
-	string ret;
-	auto indent = indented(indentCount);
+	auto code = CodeBuilder(indentCount);
 	with(child) {
 		if(type == "group")
 			throw new Exception("Group type not supported");
-
 		string tname = name;
 		if (is_exten) tname = "__exten"~tname;
-		if(isReserved(tname)) {
-			tname = tname ~ "_";
+		if(modifier == "repeated") {
+			code.build("add_");
+			code.buildRaw(tname);
+			code.buildRaw("(");
+			code.saveBuild("append_open");
+			code.buildRaw(");\n");
+			code.saveBuild("append_close");
+
+			code.build(tname);
+			if(isReserved(tname))
+				code.buildRaw("_");
+			code.buildRaw(" = ");
+			code.saveBuild("tname");
+		} else {
+			code.build(tname);
+			if(isReserved(tname))
+				code.buildRaw("_");
+			code.buildRaw(" = ");
+			code.saveBuild("append_open");
+			code.buildRaw(";\n");
+			code.saveBuild("append_close");
 		}
-		auto nameForAdd = name;
-		if (is_exten) nameForAdd = "__exten"~nameForAdd;
 		// check header ubyte with case since we're guaranteed to be in a switch
-		ret ~= indent~"case "~to!(string)(index)~":\n";
-		indent = indented(++indentCount);
+		code.put("case "~to!(string)(index)~":", Indent.open);
+		code.push("break;\n");
+
+		code.rawPut("// Deserialize member ");
+		code.rawPut(to!(string)(index));
+		code.rawPut(" Field Name " ~ name ~ "\n");
 
 		// Class and Enum will have an undecided type
-		if(wTFromType(type) == WireType.undecided)
-			return ret ~ constructUndecided(child, indentCount, tname);
+		if(wTFromType(type) == WireType.undecided) {
+			code.rawPut(constructUndecided(child, indentCount, code.mem));
+			return code.finalize();
+		}
 
 		// Handle Packed type
 		if (packed) {
 			assert(modifier == "repeated");
 			assert(isPackable(type));
 			// Allow reading data even when not packed
-			ret ~= indent~"if (wireType != WireType.lenDelimited)\n";
-			++indentCount;
+			code.put("if (wireType != WireType.lenDelimited)\n", Indent.open);
+			code.push(Indent.close);
 		}
 
 		// Verify wire type is expected type else
 		// this is not condoned, wiretype is invalid, so explode!
-		ret ~= indented(indentCount)~"if (wireType != " ~
-			to!(string)(cast(byte)wTFromType(type))~")\n";
-		ret ~= constructMismatchException(type, indentCount+1);
+		code.put("if (wireType != " ~
+			to!(string)(cast(byte)wTFromType(type))~")\n", Indent.open);
+		code.rawPut(constructMismatchException(type, code.indentCount));
+		code.put(Indent.close);
 
 		if (packed)
-			--indentCount;
+			code.pop();
 
 		string pack;
 		switch(type) {
@@ -266,62 +295,41 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 			break;
 		case "string","bytes":
 			// no need to worry about packedness here, since it can't be
-			if(modifier == "repeated") {
-				ret ~= indented(indentCount)~"add_"~tname ~ "(\n";
-				ret ~= indented(indentCount)~"   fromByteString!("~
-					toDType(type)~")(input));\n";
-			} else {
-				ret ~= indented(indentCount)~tname ~ " =\n";
-				ret ~= indented(indentCount)~"   fromByteString!("~
-					toDType(type)~")(input);\n";
-			}
-			return ret;
+			code.putBuild("append_open");
+			code.rawPut("fromByteString!("~toDType(type)~")(input)");
+			code.putBuild("append_close");
+			return code.finalize();
 		default:
 			assert(0, "class/enum/group handled by undecided type.");
 		}
 
 		if(packed) {
-			ret ~= indented(indentCount++)~
-				"if (wireType == WireType.lenDelimited) {\n";
-			ret ~= indented(indentCount) ~ "add_" ~ nameForAdd ~ "(\n";
-			ret ~= indented(indentCount) ~
-				"   fromPacked!("~toDType(type)~","~pack~")(input));\n";
-			ret ~= indented(--indentCount) ~
-				"//Accept data even when not packed\n";
-			ret ~= indented(indentCount++) ~ "} else {\n";
+			code.put("if (wireType == WireType.lenDelimited) {\n", Indent.open);
+			code.putBuild("append_open");
+			code.rawPut("fromPacked!("~toDType(type)~","~pack~")(input)");
+			code.putBuild("append_close");
+			code.put("//Accept data even when not packed\n");
+			code.put("} else {\n", Indent.close | Indent.open);
+			code.push("}\n");
 		}
 
-		if(modifier == "repeated") {
-			ret ~= indented(indentCount) ~ "add_" ~ nameForAdd ~ "(\n";
-			ret ~= indented(indentCount) ~ "   " ~ pack ~ "(input));\n";
-		} else {
-			ret ~= indented(indentCount) ~ tname ~ " =\n";
-			ret ~= indented(indentCount) ~ "   " ~ pack ~ "(input);\n";
-		}
+		code.putBuild("append_open");
+		code.rawPut(pack~"(input)");
+		code.putBuild("append_close");
 
-		if(packed) ret ~= indented(--indentCount) ~ "}\n";
-
-		return ret;
+		return code.finalize();
 	}
 }
 
 string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
-	string ret;
-	auto indent = indented(indentCount);
+	auto code = CodeBuilder(indentCount);
 	with(child) {
 		if(type == "group")
 			throw new Exception("Group type not supported");
+		code.put("// Serialize member ");
+		code.rawPut(to!(string)(index));
+		code.rawPut(" Field Name " ~ name ~ "\n");
 
-		string tname = name;
-		if (is_exten) tname = "__exten"~tname;
-		if (modifier == "repeated" && !packed) {
-			ret ~= indent~"foreach(iter;"~tname~") {\n";
-			tname = "iter";
-			indent = indented(++indentCount);
-		}
-		if(isReserved(tname)) {
-			tname = tname ~ "_";
-		}
 		string func;
 		bool customType = false;
 		switch(type) {
@@ -344,81 +352,119 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			customType = true;
 			break;
 		}
-		// we have to have some specialized code to deal with enums vs user-defined classes, since they are both detected the same
-		if (customType) {
-			ret ~= indent~"static if (is("~type~" : Object)) {\n";
-			// packed only works for primitive types, so take care of normal repeated serialization here
-			// since we can't easily detect this without decent type resolution in the .proto parser
-			if (modifier == "repeated" && packed) {
-				ret ~= indent~"foreach(iter;"~name~") {\n";
-				indent = indented(++indentCount);
-			}
-			ret ~= indent~"	ret ~= "~(packed?"iter":tname)~".Serialize("~to!(string)(index)~");\n";
-			if (modifier == "repeated" && packed) {
-				indent = indented(--indentCount);
-				ret ~= indent~"}\n";
-			}
-			// done taking care of unpackable classes
-			ret ~= indent~"} else static if (is("~type~" == enum)) {\n";
-			indent = indented(++indentCount);
+
+		auto tname = name;
+		if (is_exten) tname = "__exten" ~ name;
+		code.buildRaw(tname);
+		code.saveBuild("funName");
+
+		if(isReserved((is_exten?"__exten":"") ~ name))
+			tname ~= "_";
+		code.buildRaw(tname);
+		code.saveBuild("tname");
+
+		if (modifier == "repeated" && !packed) {
+			code.put("foreach(iter;");
+			code.putBuild("tname");
+			code.rawPut(") {\n", Indent.open);
+			code.push("}\n");
+			code.buildRaw("iter");
+			code.saveBuild("tname");
 		}
-		auto nameForHas = name;
-		if (is_exten) nameForHas = "__exten"~nameForHas;
+
+		// we have to have some specialized code to deal with enums vs
+		// user-defined classes, since they are both detected the same
+		if (customType) {
+			code.put("static if (is("~type~" : Object)) {\n", Indent.open);
+			code.build("} else\n", Indent.close | Indent.open);
+			code.build("static assert(0,\"Can't identify type `");
+			code.buildRaw(type ~ "`\");\n");
+			code.build(Indent.close);
+			code.pushBuild();
+
+			// packed only works for primitive types, so take care of normal
+			// repeated serialization here since we can't easily detect this
+			// without decent type resolution in the .proto parser
+			if (packed) {
+				assert(modifier == "repeated");
+				code.put("foreach(iter;");
+				code.putBuild("tname");
+				code.put(") {\n", Indent.open);
+				code.push("}\n");
+			}
+			code.put("ret ~= ");
+			if(packed)
+				code.rawPut("iter");
+			else
+				code.putBuild("tname");
+			code.rawPut(".Serialize("~to!(string)(index)~");\n");
+			if (packed)
+				code.pop();
+
+			// done taking care of unpackable classes
+			code.put("} else static if (is("~type~" == enum)) {\n",
+			         Indent.close | Indent.open);
+		}
 		// take care of packed circumstances
-		ret ~= indent;
 		if (packed) {
 			assert(modifier == "repeated");
 			auto packType = toDType(type);
 			if(customType)
 				packType = "int";
-			ret ~= "if(has_"~nameForHas~")\n" ~ indented(indentCount+1);
-			ret ~= "ret ~= toPacked!("~packType~"[],"~func~")";
-		} else {
-			if (modifier != "repeated" && modifier != "required")
-				ret ~= "if (!has_"~nameForHas~") ";
-			ret ~= "ret ~= "~func;
-		}
+			code.put("if(has_");
+			code.putBuild("funName");
+			code.rawPut(")\n", Indent.open);
+			code.put("ret ~= toPacked!("~packType~"[],"~func~")");
+			code.put(Indent.close);
+		} else if (modifier != "required" && modifier != "repeated") {
+			code.put("if (has_");
+			code.putBuild("funName");
+			code.rawPut(") ");
+		} else
+			code.put(""); // Adds indenting
+
+		if(!packed)
+			code.rawPut("ret ~= "~func);
 		// finish off the parameters, because they're the same for packed or not
-		if(tname != "iter") {
-			if(packed && customType)
-				tname = "cast(int[])" ~ tname;
+		if(customType) {
+			if(packed)
+				code.rawPut("(cast(int[])(");
+			else
+				code.rawPut("(cast(int)(");
+			code.rawPush("),", Indent.none);
+		} else {
+			code.rawPut("(");
+			code.rawPush(",", Indent.none);
 		}
-		ret ~= "("~tname~","~to!(string)(index)~");\n";
-		if (customType) {
-			ret ~= indented(--indentCount)~"} else\n";
-			ret ~= indented(indentCount+1)~
-				"static assert(0,\"Can't identify type `"
-				~ type ~ "`\");\n";
-		}
-		if (modifier == "repeated" && !packed) {
-			ret ~= indented(--indentCount)~"}\n";
-		}
+
+		code.putBuild("tname");
+		code.pop();
+		code.rawPut(to!(string)(index)~");\n");
 	}
-	return ret;
+	return code.finalize();
 }
 
 /**
  */
 string toD1(PBEnum child, int indentCount = 0) {
-	auto indent = indented(indentCount);
-	string ret = "";
+	auto code = CodeBuilder(indentCount);
 	with(child) {
 		// Apply comments to enum
 		foreach(c; comments)
-			ret ~= indent ~ (c.empty() ? "":"/") ~ c ~ "\n";
+			code.put((c.empty() ? "":"/") ~ c ~ "\n");
 
-		ret ~= indent~"enum "~name~" {\n";
+		code.put("enum "~name~" {\n", Indent.open);
+		code.push("}\n");
 		foreach (key, value; values) {
 			// Apply comments to field
 			if(key in valueComments)
 				foreach(c; valueComments[key])
-					ret ~= indent ~ "\t/" ~ c ~ "\n";
+					code.put("/" ~ c ~ "\n");
 
-			ret ~= indent~"\t"~value~" = "~to!(string)(key)~",\n";
+			code.put(value~" = "~to!(string)(key)~",\n");
 		}
-		ret ~= indent~"}";
 	}
-	return ret;
+	return code.finalize();
 }
 
 version(D_Version2)
@@ -429,7 +475,7 @@ unittest {
 r"\t\w{3,6} = \d,\n" ~
 r"\t\w{3,6} = \d,\n" ~
 r"\t\w{3,6} = \d,\n\}");
-    assert(!enm.toD1.match(ans).empty);
+    assert(!enm.toD1.match(ans).empty, enm.toD1);
     assert(!enm.toD1.find(r"TOTALS = 1").empty);
     assert(!enm.toD1.find(r"ALL = 3").empty);
     assert(!enm.toD1.find(r"JUNK = 5").empty);
@@ -477,8 +523,6 @@ string genDes(PBMessage msg, int indentCount = 0) {
 		//here goes the meat, handily, it is generated in the children
 		foreach(pbchild;children) {
 			ret ~= genDes(pbchild, indentCount);
-			// tack on the break so we don't have fallthrough
-			ret ~= indented(indentCount)~"break;\n";
 		}
 		foreach(pbchild;child_exten) {
 			ret ~= genDes(pbchild, indentCount, true);
@@ -759,8 +803,12 @@ unittest {
 	                              optional int32 last = 3;
 	                          }");`);
 	mixin(`enum three = ParserData("message OtherType {
-	                              optional Type t = 1;
-	                              repeated Settings set = 2 [packed = true];
+	                              optional Type struct = 1;
+	                              repeated Settings enum = 2 [packed = true];
+	                              repeated Settings num = 3;
+	                              repeated string a = 4;
+	                              required string b = 5;
+	                              repeated Type t = 6;
 	                          }");`);
 	mixin(`enum ichi = PBCTEnum(one);`);
 	mixin(`enum ni = PBCompileTime(two);`);
@@ -770,4 +818,48 @@ unittest {
 	mixin(ichi.toD1);
 	mixin("static " ~ ni.toD1);
 	mixin("static " ~ san.toD1);
+	ubyte[] feed = [((1 << 3) | 2), 8, // OtherType.Type
+	((1 << 3) | 0), 1, ((1 << 3) | 0), 2, // Type.Data
+	((2 << 3) | 2), 2, 3, 4, // Type.Extra
+
+	((2 << 3) | 2), 1, 1, // OtherType.enum
+	((3 << 3) | 0), 2, // OtherType.num
+	((4 << 3) | 2), 1, 'a', // OtherType.a
+	((4 << 3) | 2), 1, 'b', // OtherType.a
+	((5 << 3) | 2), 2, 'c', 'd', // OtherType.b
+
+	((6 << 3) | 2), 4, // OtherType.Type
+	((1 << 3) | 0), 2, // Type.Data
+	((1 << 3) | 0), 2, // Type.Data
+	((6 << 3) | 2), 2, // OtherType.Type
+	((1 << 3) | 0), 3, // Type.Data
+	];
+	auto ot = new OtherType(feed);
+	assert(ot.struct_.data == [1, 2]);
+	assert(ot.struct_.extra == [3, 4]);
+	assert(ot.enum_ == [Settings.FOO]);
+	assert(ot.num == [Settings.BAR]);
+	assert(ot.a == ["a", "b"]);
+	assert(ot.b == "cd");
+	assert(ot.t[0].data == [2,2]);
+	assert(ot.t[1].data == [3]);
+	assert(ot.t.length == 2);
+
+	auto res = ot.Serialize();
+	assert(res == feed);
+}
+
+version(D_Version2)
+unittest {
+	// Conversion of reserved names
+	mixin(`enum str = ParserData("message String {
+	                              repeated string version = 1;
+	                              optional string enum = 2; }");`);
+	mixin(`enum msg = PBCompileTime(str);`);
+	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import std.typecons;`);
+	mixin("static " ~ msg.toD1);
+	//auto t2 = new Test2(feed);
+	//assert(t2.b == "testing");
+	//assert(t2.Serialize() == feed);
 }
