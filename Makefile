@@ -12,3 +12,6 @@ libdprotobuf: $(Library) $(Generator)
 
 pbcompiler: pbcompiler.d $(Generator) $(Library)
 	$(dc) $(args) $^
+	
+clean:
+	rm -rf *.o *.a pbcompiler
