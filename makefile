@@ -7,7 +7,7 @@ Library=conversion/pbbinary.d pbchild.d pbenum.d pbextension.d pbgeneral.d\
 
 all: libdprotobuf pbcompiler
 
-libdprotobuf: $(Library)
+libdprotobuf: $(Library) $(Generator)
 	$(dc) -O -release -lib -oflibdprotobuf $^
 
 pbcompiler: pbcompiler.d $(Generator) $(Library)
