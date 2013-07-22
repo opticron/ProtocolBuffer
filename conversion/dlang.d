@@ -55,12 +55,22 @@ string toD(PBChild child, int indentCount = 0) {
 			code.put("///\n");
 
 		// Make field declaration
-		code.put(is_dep ? "deprecated " : "");
+		if(is_dep) code.put("deprecated ref ");
+		else code.put("");
 		code.rawPut(typeWrapper(child));
+		code.rawPut(" ");
+		code.rawPut(name);
 		if(isReserved(name))
-			code.rawPut(" " ~ name ~ "_");
-		else
-			code.rawPut(" " ~ name);
+			code.rawPut("_");
+		if(is_dep) {
+			code.rawPut("() {\n", Indent.open);
+			code.push("}\n");
+			code.put("return " ~ name ~ "_dep;\n");
+			code.pop();
+			code.put("private ");
+			code.rawPut(typeWrapper(child));
+			code.put(" " ~ name ~ "_dep");
+		}
 		if(!empty(valdefault)) // Apply default value
 			code.rawPut(" = " ~ valdefault);
 		code.rawPut(";");
@@ -98,7 +108,9 @@ unittest {
 	// Conversion for default, negative, deprecated value
 	str = ParserData("optional int64 value = 1 [default=-32,deprecated=true];");
 	child = PBChild(str);
-	ans = "///\ndeprecated Nullable!(long) value = -32;";
+	ans = "///\ndeprecated ref Nullable!(long) value() {\n";
+	ans ~= "\treturn value_dep;\n}\n";
+	ans ~= "private Nullable!(long) value_dep = -32;";
 	assert(toD(child) == ans);
 
 	// Conversion for commented, indented
@@ -171,6 +183,7 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 
 		string tname = name;
 		if (is_exten) tname = "__exten"~tname;
+		if (is_dep) tname ~= "_dep";
 		if(isReserved(tname)) {
 			tname = tname ~ "_";
 		}
@@ -289,12 +302,10 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			customType = true;
 			break;
 		}
-		auto tname = name;
-		if (is_exten) tname = "__exten" ~ name;
-		code.buildRaw(tname);
-		code.saveBuild("funName");
+		auto tname = (is_exten?"__exten":"") ~ name;
 
-		if(isReserved((is_exten?"__exten":"") ~ name))
+		if(is_dep) tname ~= "_dep";
+		if(isReserved(tname))
 			tname ~= "_";
 		code.buildRaw(tname);
 		code.saveBuild("tname");
@@ -535,8 +546,9 @@ string genMerge(PBMessage msg, int indentCount = 0) {
 		// merge code
 		foreach(pbchild;children) {
 			auto field = pbchild.name;
+			if(pbchild.is_dep) field ~= "_dep";
 			if(isReserved(field))
-				field = pbchild.name ~ "_";
+				field = field ~ "_";
 			if (pbchild.modifier != "repeated") {
 			ret ~= indent~"if (!merger."~field~".isNull) "~
 				field~" = merger."~field~";\n";
