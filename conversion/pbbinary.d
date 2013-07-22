@@ -11,37 +11,53 @@ version(D_Version2) {
 
 import std.stdio;
 
+/**
+ * Stores the integer value for each wire type.
+ *
+ * Undecided is used on custom types; given a type name
+ * a wire type can not be determined until identifying
+ * if the type is a enum or struct.
+ */
 enum WireType : byte {
-    varint,
-    fixed64,
-    lenDelimited,
-    startGroup, // Deprecated
-    endGroup, // Deprecated
-    fixed32,
-    undecided = -1
+	varint,
+	fixed64,
+	lenDelimited,
+	startGroup, // Deprecated
+	endGroup, // Deprecated
+	fixed32,
+	undecided = -1
 }
 
-// varint translation code
-// this may have endian issues, maybe not, we'll see
+/**
+ * Encode a type as a varint.
+ */
 ubyte[]toVarint(bool input,int field) {
 	return toVarint(cast(long)(input?1:0),field);
 }
+/// ditto
 ubyte[]toVarint(uint input,int field) {
 	return toVarint(cast(long)input,field);
 }
+/// ditto
 ubyte[]toVarint(int input,int field) {
 	return toVarint(cast(long)input,field);
 }
+/// ditto
 ubyte[]toVarint(ulong input,int field) {
 	return toVarint(cast(long)input,field);
 }
+/// ditto
 ubyte[]toVarint(long input,int field) {
 	ubyte[]ret;
 	// tack on the header and the varint
-	ret = genHeader(field,0)~_toVarint(input);
+	ret = genHeader(field,WireType.varint)~toVarint(input);
 	return ret;
 }
-ubyte[]_toVarint(long input) {
+
+/**
+ * Encode a varint without a header.
+ */
+ubyte[] toVarint(long input) {
 	ubyte[]ret;
 	int x;
 	if (input < 0) {
@@ -50,7 +66,8 @@ ubyte[]_toVarint(long input) {
 	} else {
 		long tmp = input;
 		for (x = 1;tmp >= 128;x++) {
-			// arithmetic shift is fine, because we've already checked for negative numbers
+			// arithmetic shift is fine, because we've already checked for
+			// negative numbers
 			tmp >>= 7;
 		}
 		ret.length = x;
@@ -66,7 +83,10 @@ ubyte[]_toVarint(long input) {
 	return ret;
 }
 
-T fromVarint(T)(ref ubyte[]input)
+/**
+ * Decodes a varint to the requested type.
+ */
+T fromVarint(T)(ref ubyte[] input)
 in {
 	assert(input.length);
 } body {
@@ -108,16 +128,28 @@ in {
 	return cast(T)output;
 }
 
-int getWireType(int input) {
-	return input&0b111;
+/**
+ * Provide the specified wiretype from the header.
+ *
+ * Does not varify type is known as future wire types
+ * could be introduced.
+ */
+WireType getWireType(int header) {
+	return cast(WireType)(header&0b111);
 }
 
-int getFieldNumber(int input) {
-	return input>>3;
+/**
+ * Provide the specified field number from the header.
+ */
+int getFieldNumber(int header) {
+	return header>>3;
 }
 
-ubyte[]genHeader(int field,ubyte wiretype) {
-	return _toVarint((field<<3)|(wiretype&0x3));
+/**
+ * Encodes a header.
+ */
+ubyte[] genHeader(int field, WireType wiretype) {
+	return toVarint((field<<3)|wiretype);
 }
 
 unittest {
@@ -180,9 +212,9 @@ ubyte[]toSInt(long input,int field) {
 }
 
 T fromSInt(T)(ref ubyte[]input) {
-	static if (!is(T == int) && !is(T == long)) {
-		throw new Exception("fromSInt only works with types int or long.");
-	}
+	static assert(is(T == int) || is(T == long),
+		"fromSInt only works with types int or long.");
+
 	T tmp = fromVarint!(T)(input);
 	tmp = (tmp>>1)^cast(T)(tmp&0x1?0xFFFFFFFFFFFFFFFF:0);
 	return tmp;
@@ -217,22 +249,27 @@ unittest {
 	debug writefln("");
 }
 
-// here are the remainder of the numeric types, basically just 32 and 64 bit blobs
-// valid for uint, float, ulong, and double
+/**
+ * Fixed sized numeric types.
+ *
+ * Valid for uint, float, ulong, and double
+ */
 ubyte[]toByteBlob(T)(T input,int field) {
 	ubyte[]ret;
 	ubyte[]tmp = (cast(ubyte*)&input)[0..T.sizeof].dup;
 	version (BigEndian) {tmp.reverse;}
-	ret = genHeader(field,T.sizeof==8?1:5)~tmp[0..T.sizeof];
+	ret = genHeader(field,T.sizeof==8?WireType.fixed64:WireType.fixed32)
+	      ~tmp[0..T.sizeof];
 	return ret;
 }
 
+/// ditto
 T fromByteBlob(T)(ref ubyte[]input)
 in {
 	assert(input.length >= T.sizeof);
 } body {
 	T ret;
-	ubyte[]tmp = input[0..T.sizeof]; 
+	ubyte[]tmp = input[0..T.sizeof];
 	input = input[T.sizeof..$];
 	version (BigEndian) {tmp.reverse;}
 	(cast(ubyte*)&ret)[0..T.sizeof] = tmp[0..T.sizeof];
@@ -247,13 +284,17 @@ unittest {
 	debug writefln("");
 }
 
-// string functions!
+/**
+ * Handle strings
+ */
 ubyte[]toByteString(T)(T[]input,int field) {
-	// we need to rip off the generated header ubyte for code reuse, this could be done better
-	ubyte[]tmp = _toVarint(input.length);
-	return genHeader(field,2)~tmp~cast(ubyte[])input;
+	// we need to rip off the generated header ubyte for code reuse, this could
+	// be done better
+	ubyte[]tmp = toVarint(input.length);
+	return genHeader(field,WireType.lenDelimited)~tmp~cast(ubyte[])input;
 }
 
+/// ditto
 T[]fromByteString(T:T[])(ref ubyte[]input) {
 	uint len = fromVarint!(uint)(input);
 	if (len > input.length) {
@@ -273,11 +314,17 @@ unittest {
 	debug writefln("");
 }
 
+/**
+ * Remove unknown field from input.
+ *
+ * Returns:
+ * The data of field.
+ */
 ubyte[]ripUField(ref ubyte[]input,int wiretype) {
 	switch(wiretype) {
 	case 0:
 		// snag a varint
-		return _toVarint(fromVarint!(long)(input));
+		return toVarint(fromVarint!(long)(input));
 	case 1:
 		// snag a 64bit chunk
 		ubyte[]tmp = input[0..8];
@@ -287,7 +334,7 @@ ubyte[]ripUField(ref ubyte[]input,int wiretype) {
 		// snag a length delimited chunk
 		auto blen = fromVarint!(long)(input);
 		ubyte[]tmp = input[0..cast(uint)blen];
-		return _toVarint(blen)~tmp;
+		return toVarint(blen)~tmp;
 	case 5:
 		// snag a 32bit chunk
 		ubyte[]tmp = input[0..4];
@@ -300,7 +347,9 @@ ubyte[]ripUField(ref ubyte[]input,int wiretype) {
 	assert(0);
 }
 
-// handle packed fields
+/**
+ * Handle packed fields.
+ */
 ubyte[]toPacked(T:T[],alias serializer)(T[] packed,int field) {
 	// zero length packed repeated fields serialize to nothing
 	if (!packed.length) return null;
@@ -309,11 +358,13 @@ ubyte[]toPacked(T:T[],alias serializer)(T[] packed,int field) {
 		// serialize everything, but leave off the header bytes for all of them
 		ret ~= serializer(pack,field)[1..$];
 	}
-	// now that everything is serialized, grab the length, convert to varint, and tack on a header
-	ret = genHeader(field,cast(ubyte)2)~_toVarint(ret.length)~ret;
+	// now that everything is serialized, grab the length, convert to varint,
+	// and tack on a header
+	ret = genHeader(field,WireType.lenDelimited)~toVarint(ret.length)~ret;
 	return ret;
 }
 
+/// ditto
 T[]fromPacked(T,alias deserializer)(ref ubyte[]input) {
 	T[]ret;
 	// it's assumed that the field is already ripped off
