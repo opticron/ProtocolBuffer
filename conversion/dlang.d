@@ -481,7 +481,7 @@ string genDes(PBMessage msg, int indentCount = 0) {
 		ret ~= indent~"default:\n";
 		ret ~= indent~"	// rip off unknown fields\n";
 		ret ~= indent~"if(input.length)\n";
-		ret ~= indented(indentCount+1)~"ufields ~= _toVarint(header)~\n";
+		ret ~= indented(indentCount+1)~"ufields ~= toVarint(header)~\n";
 		ret ~= indented(indentCount+1)~
 			"   ripUField(input,getWireType(header));\n";
 		ret ~= indent~"break;\n";
@@ -528,7 +528,7 @@ string genSer(PBMessage msg, int indentCount = 0) {
 		ret ~= indent~"// take care of header and length generation if necessary\n";
 		ret ~= indent~"if (field != -1) {\n";
 		// take care of length calculation and integration of header and length
-		ret ~= indented(indentCount+1)~"ret = genHeader(field,2)~toVarint(ret.length,field)[1..$]~ret;\n";
+		ret ~= indented(indentCount+1)~"ret = genHeader(field,WireType.lenDelimited)~toVarint(ret.length,field)[1..$]~ret;\n";
 		ret ~= indent~"}\n";
 
 		ret ~= indent~"return ret;\n";
