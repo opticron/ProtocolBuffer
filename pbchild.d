@@ -119,37 +119,41 @@ struct PBChild {
 			pbstring = pbstring[1..pbstring.length];
 			return child;
 		}
-		throw new PBParseException("Child Instantiation("~child.type~" "~child.name~")","No idea what to do with string after index and options.", pbstring.line);
+		throw new PBParseException("Child Instantiation("
+		                           ~child.type~" "~child.name~")",
+		          "No idea what to do with string after index and options.",
+		          pbstring.line);
 	}
 }
 
 string toDType(string intype) {
-        string retstr;
-        switch(intype) {
-        case "sint32","sfixed32","int32":
-                retstr = "int";
-                break;
-        case "sint64","sfixed64","int64":
-                retstr = "long";
-                break;
-        case "fixed32","uint32":
-                retstr = "uint";
-                break;
-        case "fixed64","uint64":
-                retstr = "ulong";
-                break;
-        case "string":
-                retstr = "string";
-                break;
-        case "bytes":
-                retstr = "ubyte[]";
-                break;
-        default:
-                // this takes care of float, double, and bool as well
-                retstr = intype;
-                break;
-        }
-        return retstr;
+	string retstr;
+	switch(intype) {
+		case "sint32","sfixed32","int32":
+			retstr = "int";
+			break;
+		case "sint64","sfixed64","int64":
+			retstr = "long";
+			break;
+		case "fixed32","uint32":
+			retstr = "uint";
+			break;
+		case "fixed64","uint64":
+			retstr = "ulong";
+			break;
+		case "string":
+			retstr = "string";
+			break;
+		case "bytes":
+			retstr = "ubyte[]";
+			break;
+		case "float":
+		case "double":
+		case "bool":
+		default:
+			retstr = intype;
+	}
+	return retstr;
 }
 
 unittest {

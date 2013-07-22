@@ -41,7 +41,10 @@ struct PBRoot {
 		retstr ~= "} else {\n";
 			retstr ~= "\timport std.string;\n";
 			retstr ~= "\tstring makeString(T)(T v) {\n";
-			retstr ~= "\t\treturn toString(v);\n";
+			retstr ~= "\t\tstatic if(is(T == enum))\n";
+			retstr ~= "\t\t\treturn toString(cast(int)v);\n";
+			retstr ~= "\t\t\telse\n";
+			retstr ~= "\t\t\treturn toString(v);\n";
 			retstr ~= "\t}\n";
 		retstr ~= "}\n";
 
