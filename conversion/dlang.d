@@ -4,6 +4,7 @@
  */
 module ProtocolBuffer.conversion.dlang;
 
+import ProtocolBuffer.pbroot;
 import ProtocolBuffer.pbgeneral;
 import ProtocolBuffer.pbchild;
 import ProtocolBuffer.pbenum;
@@ -41,6 +42,29 @@ private string typeWrapper(PBChild child) {
 		return format("Nullable!(%s[])", toDType(child.type));
 	else
 		return format("Nullable!(%s)", toDType(child.type));
+}
+
+string langD(PBRoot root) {
+	auto code = CodeBuilder(0);
+    code.put("import ProtocolBuffer.conversion.pbbinary;\n");
+    code.put("import std.conv;\n");
+    code.put("import std.typecons;\n\n");
+
+    code.put("string makeString(T)(T v) {\n");
+    code.put("\treturn to!string(v);\n");
+    code.put("}\n");
+
+    // do what we need for extensions defined here
+    code.put(root.extensions.genExtString(""));
+    // write out enums
+    foreach(pbenum; root.enum_defs) {
+        code.put(toD(pbenum, 0));
+    }
+    // write out message definitions
+    foreach(pbmsg; root.message_defs) {
+        code.put(toD(pbmsg, 0));
+    }
+    return code.finalize();
 }
 
 /**

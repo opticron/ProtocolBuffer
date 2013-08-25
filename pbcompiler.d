@@ -5,6 +5,8 @@ import ProtocolBuffer.pbroot;
 import ProtocolBuffer.pbextension;
 import ProtocolBuffer.pbmessage;
 import ProtocolBuffer.pbgeneral;
+import ProtocolBuffer.conversion.d1lang;
+import ProtocolBuffer.conversion.dlang;
 
 import std.conv;
 import std.file;
@@ -170,10 +172,10 @@ void writeRoots(Language lang) {
 		}
 		switch(lang) {
 			case Language.D1:
-				tmp ~= root.langD1();
+				tmp ~= langD1(root);
 				break;
 			case Language.D2:
-				tmp ~= root.langD();
+				tmp ~= langD(root);
 				break;
 			default:
 				assert(false);

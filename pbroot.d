@@ -6,8 +6,6 @@ import ProtocolBuffer.pbgeneral;
 import ProtocolBuffer.pbmessage;
 import ProtocolBuffer.pbenum;
 import ProtocolBuffer.pbextension;
-import ProtocolBuffer.conversion.dlang;
-import ProtocolBuffer.conversion.d1lang;
 
 version(D_Version2) {
 	import std.algorithm;
@@ -25,63 +23,6 @@ struct PBRoot {
 	string Package;
 	string[] comments;
 	PBExtension[]extensions;
-	string toDString() {
-		return langD1();
-	}
-	string langD1() {
-		string retstr = "";
-		retstr ~= "import ProtocolBuffer.conversion.pbbinary;\n";
-		retstr ~= "import std.string;\n\n";
-
-		retstr ~= "version(D_Version2) {\n";
-			retstr ~= "\timport std.conv;\n";
-			retstr ~= "\tstring makeString(T)(T v) {\n";
-			retstr ~= "\t\treturn to!(string)(v);\n";
-			retstr ~= "\t}\n";
-		retstr ~= "} else {\n";
-			retstr ~= "\timport std.string;\n";
-			retstr ~= "\tstring makeString(T)(T v) {\n";
-			retstr ~= "\t\tstatic if(is(T == enum))\n";
-			retstr ~= "\t\t\treturn toString(cast(int)v);\n";
-			retstr ~= "\t\t\telse\n";
-			retstr ~= "\t\t\treturn toString(v);\n";
-			retstr ~= "\t}\n";
-		retstr ~= "}\n";
-
-		// do what we need for extensions defined here
-		retstr ~= extensions.genExtString("");
-		// write out enums
-		foreach(pbenum;enum_defs) {
-			retstr ~= toD1(pbenum, 0);
-		}
-		// write out message definitions
-		foreach(pbmsg;message_defs) {
-			retstr ~= toD1(pbmsg, 0);
-		}
-		return retstr;
-    }
-	string langD() {
-		string retstr = "";
-		retstr ~= "import ProtocolBuffer.conversion.pbbinary;\n";
-		retstr ~= "import std.conv;\n";
-		retstr ~= "import std.typecons;\n\n";
-
-		retstr ~= "string makeString(T)(T v) {\n";
-		retstr ~= "\treturn to!string(v);\n";
-		retstr ~= "}\n";
-
-		// do what we need for extensions defined here
-		retstr ~= extensions.genExtString("");
-		// write out enums
-		foreach(pbenum;enum_defs) {
-			retstr ~= toD(pbenum, 0);
-		}
-		// write out message definitions
-		foreach(pbmsg;message_defs) {
-			retstr ~= toD(pbmsg, 0);
-		}
-		return retstr;
-	}
 
 	static PBRoot opCall(string input)
 	in {
