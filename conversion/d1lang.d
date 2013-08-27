@@ -4,6 +4,7 @@
  */
 module ProtocolBuffer.conversion.d1lang;
 
+import ProtocolBuffer.pbroot;
 import ProtocolBuffer.pbgeneral;
 import ProtocolBuffer.pbchild;
 import ProtocolBuffer.pbenum;
@@ -46,6 +47,39 @@ private string typeWrapper(PBChild child) {
 		return format("%s[]", toDType(child.type));
 	else
 		return format("%s", toDType(child.type));
+}
+
+string langD1(PBRoot root) {
+	auto code = CodeBuilder(0);
+    code.put("import ProtocolBuffer.conversion.pbbinary;\n");
+    code.put("import std.string;\n\n");
+
+    code.put("version(D_Version2) {\n");
+    code.put("\timport std.conv;\n");
+    code.put("\tstring makeString(T)(T v) {\n");
+    code.put("\t\treturn to!(string)(v);\n");
+    code.put("\t}\n");
+    code.put("} else {\n");
+    code.put("\timport std.string;\n");
+    code.put("\tstring makeString(T)(T v) {\n");
+    code.put("\t\tstatic if(is(T == enum))\n");
+    code.put("\t\t\treturn toString(cast(int)v);\n");
+    code.put("\t\t\telse\n");
+    code.put("\t\t\treturn toString(v);\n");
+    code.put("\t}\n");
+    code.put("}\n");
+
+    // do what we need for extensions defined here
+    code.put(root.extensions.genExtString(""));
+    // write out enums
+    foreach(pbenum; root.enum_defs) {
+        code.put(toD1(pbenum, 0));
+    }
+    // write out message definitions
+    foreach(pbmsg; root.message_defs) {
+        code.put(toD1(pbmsg, 0));
+    }
+    return code.finalize();
 }
 
 /**

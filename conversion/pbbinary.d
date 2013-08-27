@@ -312,6 +312,15 @@ unittest {
 	assert(test == fromByteString!(string)(tmp));
 	assert(tmp.length == 0);
 	debug writefln("");
+
+	ubyte[] data = [0x03, // Length
+	    0x05, 0x06, 0x07,
+	    0x00, // Length
+	    0x01, // Length
+	    0x08];
+	assert(fromByteString!(ubyte[])(data) == cast(ubyte[])[0x05, 0x06, 0x07]);
+	assert(fromByteString!(ubyte[])(data) == cast(ubyte[])[]);
+	assert(fromByteString!(ubyte[])(data) == cast(ubyte[])[0x08]);
 }
 
 /**
