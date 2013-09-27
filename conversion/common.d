@@ -118,7 +118,9 @@ struct CodeBuilder {
 			case "":
 				if(!indent)
 					goto default;
+				goto case;
 			case "\n":
+				goto case;
 			case "\r\n":
 				rawPut(str, indent);
 				break;

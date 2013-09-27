@@ -172,15 +172,15 @@ bool isValidChar(CClass cc,char pc) {
 	switch(cc) {
 	case CClass.Value:
 		if (pc == '-') return true;
-		break;
+		goto case;
 	case CClass.MultiIdentifier:
 		if (pc == '.') return true;
-		break;
+		goto case;
 	case CClass.Identifier:
 		if (pc >= 'a' && pc <= 'z') return true;
 		if (pc >= 'A' && pc <= 'Z') return true;
 		if (pc == '_') return true;
-		break;
+		goto case;
 	case CClass.Numeric:
 		if (pc >= '0' && pc <= '9') return true;
 		return false;
