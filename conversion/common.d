@@ -180,8 +180,7 @@ struct CodeBuilder {
 				put(op.text, op.indent);
 
 		lower.popBack();
-		version(D_Version2) if(__ctfe) { } else
-			assumeSafeAppend(lower);
+		version(D_Version2) if(!__ctfe) assumeSafeAppend(lower);
 	}
 
 	/**
