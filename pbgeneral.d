@@ -144,7 +144,6 @@ in {
 	default:
 		throw new PBParseException("Protocol Buffer Definition","Unknown element type "~type~".", pbstring.line);
 	}
-	throw new PBParseException("Protocol Buffer Definition","Element type "~type~" fell through the switch.", pbstring.line);
 }
 
 // this will rip off the next token
@@ -173,12 +172,15 @@ bool isValidChar(CClass cc,char pc) {
 	switch(cc) {
 	case CClass.Value:
 		if (pc == '-') return true;
+		goto case;
 	case CClass.MultiIdentifier:
 		if (pc == '.') return true;
+		goto case;
 	case CClass.Identifier:
 		if (pc >= 'a' && pc <= 'z') return true;
 		if (pc >= 'A' && pc <= 'Z') return true;
 		if (pc == '_') return true;
+		goto case;
 	case CClass.Numeric:
 		if (pc >= '0' && pc <= '9') return true;
 		return false;
@@ -188,8 +190,10 @@ bool isValidChar(CClass cc,char pc) {
 		if (pc == '\f') return false;
 		return true;
 	default:
-		assert(false, "Missing switch case");
+		break;
 	}
+	
+	assert(false, "Missing switch case");
 }
 
 bool validIdentifier(string ident)

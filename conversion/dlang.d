@@ -350,7 +350,7 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			code.put("static if (is("~type~" == struct)) {\n", Indent.open);
 			code.build("} else\n", Indent.close | Indent.open);
 			code.build("static assert(0,\"Can't identify type `");
-			code.buildRaw(type ~ "`\");\n");;
+			code.buildRaw(type ~ "`\");\n");
 			code.build(Indent.close);
 			code.pushBuild();
 			// packed only works for primitive types, so take care of normal

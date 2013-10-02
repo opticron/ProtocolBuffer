@@ -123,7 +123,7 @@ struct PBMessage {
 							goto default;
 						case PBTypes.PB_Enum:
 							message.enum_defs[$-1].comments
-								= storeComment.comments;;
+								= storeComment.comments;
 							goto default;
 						case PBTypes.PB_Repeated:
 						case PBTypes.PB_Required:
