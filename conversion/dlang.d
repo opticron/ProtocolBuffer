@@ -534,7 +534,7 @@ string genSer(PBMessage msg, int indentCount = 0) {
 	string ret = "";
 	with(msg) {
 		// use -1 as a default value, since a nibble can not produce that number
-		ret ~= indent~"ubyte[] Serialize(int field = -1) {\n";
+		ret ~= indent~"ubyte[] Serialize(int field = -1) const {\n";
 		indent = indented(++indentCount);
 		// codegen is fun!
 		ret ~= indent~"ubyte[] ret;\n";
