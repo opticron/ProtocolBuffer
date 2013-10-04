@@ -474,8 +474,11 @@ string genDes(PBMessage msg, int indentCount = 0) {
 		// add comments
 		code.put("// if we're root, we can assume we own the whole string\n");
 		code.put("// if not, the first thing we need to do is pull the length that belongs to us\n");
-		code.put("static "~name~" Deserialize(ubyte[] manip, bool isroot=true) {", Indent.open);
-		code.put("return "~name~"(manip,isroot);\n");
+		code.put("static "~name~" Deserialize(ubyte[] manip) {\n", Indent.open);
+		code.put("return "~name~"(manip,true);\n");
+		code.put("}\n", Indent.close);
+		code.put("this(ubyte[] manip,bool isroot=true) {\n", Indent.open);
+		code.put("this(manip,isroot);\n");
 		code.put("}\n", Indent.close);
 		code.put("this(ref ubyte[] manip,bool isroot=true) {\n", Indent.open);
 		code.push("}\n");
@@ -724,7 +727,7 @@ unittest {
 	ubyte[] feed = [0x12,0x07, // (tag 2, type 2) (length 7)
 		0x74,0x65,0x73,0x74,0x69,0x6e,0x67
 			]; // From example
-	auto t2 = Test2(feed);
+	auto t2 = Test2(feed[]);
 	assert(t2.b == "testing");
 	assert(t2.Serialize() == feed);
 }
