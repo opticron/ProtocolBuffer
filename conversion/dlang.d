@@ -362,8 +362,14 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 				code.putBuild("tname");
 				code.put(") {\n", Indent.open);
 				code.push("}\n");
-			}
-			code.put("ret ~= ");
+			} else if (modifier != "required" && modifier != "repeated") {
+				code.put("if (!");
+				code.putBuild("tname");
+				code.rawPut(".isNull) ");
+			} else
+				code.put(""); // Adds indenting
+
+			code.rawPut("ret ~= ");
 			if (packed)
 				code.rawPut("iter");
 			else
@@ -417,6 +423,27 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 
 	}
 	return code.finalize();
+}
+
+version(D_Version2)
+unittest {
+	PBChild child;
+
+	// Optional messages don't ser if missing issue #27
+	auto str = ParserData("optional SomeMessage sm = 2;");
+	child = PBChild(str);
+	import std.stdio;
+	mixin(`enum one = ParserData("message AnyLineDescriptor {
+                                 optional SomeMessage m2 = 2; }");`);
+	mixin(`enum two = ParserData("message SomeMessage {}");`);
+	mixin(`enum ichi = PBCompileTime(one);`);
+	mixin(`enum ni = PBCompileTime(two);`);
+	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import std.typecons;`);
+	mixin("static " ~ ni.toD);
+	mixin("static " ~ ichi.toD);
+	AnyLineDescriptor ald;
+	ald.Serialize();
 }
 
 /**
@@ -817,7 +844,7 @@ unittest {
 	((6 << 3) | 2), 2, // OtherType.Type
 	((1 << 3) | 0), 3, // Type.Data
 	];
-	auto ot = new OtherType(feed);
+	auto ot = OtherType(feed);
 	assert(ot.struct_.data == [1, 2]);
 	assert(ot.struct_.extra == [3, 4]);
 	assert(ot.enum_ == [Settings.FOO]);
