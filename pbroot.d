@@ -84,33 +84,37 @@ struct PBRoot {
 			// rip off whitespace before looking for the next definition
 			// this needs to stay at the end
 			pbstring = stripLWhite(pbstring);
+			tryAttachComments(root, storeComment);
 
-			// Attach Comments to elements
-			if(!storeComment.comments.empty()) {
-				if(storeComment.line == storeComment.lastElementLine
-				   || storeComment.line+3 > storeComment.lastElementLine) {
-					switch(storeComment.lastElementType) {
-						case PBTypes.PB_Comment:
-							break;
-						case PBTypes.PB_Message:
-							root.message_defs[$-1].comments
-								= storeComment.comments;
-							goto default;
-						case PBTypes.PB_Enum:
-							root.enum_defs[$-1].comments
-								= storeComment.comments;
-							goto default;
-						case PBTypes.PB_Package:
-							root.comments
-								= storeComment.comments;
-							goto default;
-						default:
-							storeComment.comments = null;
-					}
+		}
+		return root;
+	}
+
+	static void tryAttachComments(ref PBRoot root, ref CommentManager storeComment) {
+		// Attach Comments to elements
+		if(!storeComment.comments.empty()) {
+			if(storeComment.line == storeComment.lastElementLine
+			   || storeComment.line+3 > storeComment.lastElementLine) {
+				switch(storeComment.lastElementType) {
+					case PBTypes.PB_Comment:
+						break;
+					case PBTypes.PB_Message:
+						root.message_defs[$-1].comments
+							= storeComment.comments;
+						goto default;
+					case PBTypes.PB_Enum:
+						root.enum_defs[$-1].comments
+							= storeComment.comments;
+						goto default;
+					case PBTypes.PB_Package:
+						root.comments
+							= storeComment.comments;
+						goto default;
+					default:
+						storeComment.comments = null;
 				}
 			}
 		}
-		return root;
 	}
 
 	static string parsePackage(ref ParserData pbstring)
@@ -135,6 +139,16 @@ struct PBRoot {
 		return Package;
 	}
 
+}
+
+// Verify comments attach to root/module/package
+unittest {
+	string pbstr = "// Openning comments
+		package openning;";
+	auto root = PBRoot(pbstr);
+	assert(root.Package == "openning");
+	assert(root.comments.length == 1);
+	assert(root.comments[0] == "// Openning comments");
 }
 
 

@@ -29,6 +29,8 @@ version(D_Version2) {
     }
 
     bool skipOver(ref string str, string c) {
+        if(str.length < c.length) return false;
+
         if(str[0..c.length] == c) {
             str = str[c.length..$];
             return true;

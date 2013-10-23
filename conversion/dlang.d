@@ -73,10 +73,7 @@ string toD(PBChild child, int indentCount = 0) {
 	auto code = CodeBuilder(indentCount);
 	with(child) {
 		// Apply comments to field
-		foreach(c; comments)
-			code.put((c.empty() ? "":"/") ~ c ~ "\n");
-		if(comments.empty())
-			code.put("///\n");
+		code.rawPut(addComments(comments, code.indentCount));
 
 		// Make field declaration
 		if(is_dep) code.put("deprecated ref ");
@@ -452,16 +449,16 @@ string toD(PBEnum child, int indentCount = 0) {
 	auto code = CodeBuilder(indentCount);
 	with(child) {
 		// Apply comments to enum
-		foreach(c; comments)
-			code.put((c.empty() ? "":"/") ~ c ~ "\n");
+		code.rawPut(addComments(comments, code.indentCount));
 
 		code.put("enum "~name~" {\n", Indent.open);
 		code.push("}\n");
 		foreach (key, value; values) {
 			// Apply comments to field
 			if(key in valueComments)
-				foreach(c; valueComments[key])
-					code.put("/" ~ c ~ "\n");
+				code.rawPut(addComments(valueComments[key], code.indentCount));
+			else
+				code.put("///\n");
 
 			code.put(value~" = "~to!(string)(key)~",\n");
 		}
@@ -471,27 +468,30 @@ string toD(PBEnum child, int indentCount = 0) {
 
 version(D_Version2)
 unittest {
-	auto str = ParserData("enum potato {TOTALS = 1;JUNK= 5 ; ALL =3;}");
-	auto enm = PBEnum(str);
-	auto ans = regex(r"enum potato \{\n" ~
-r"\t\w{3,6} = \d,\n" ~
-r"\t\w{3,6} = \d,\n" ~
-r"\t\w{3,6} = \d,\n\}");
-	assert(!enm.toD.match(ans).empty);
-	assert(!enm.toD.find(r"TOTALS = 1").empty);
-	assert(!enm.toD.find(r"ALL = 3").empty);
-	assert(!enm.toD.find(r"JUNK = 5").empty);
+	mixin(`enum str = ParserData("enum potato
+                                 {TOTALS = 1;JUNK= 5 ; ALL =3;}");`);
+	mixin(`enum enm = PBCTEnum(str);`);
+	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import std.typecons;`);
+	mixin(enm.toD);
+	assert(potato.TOTALS == 1);
+	assert(potato.JUNK == 5);
+	assert(potato.ALL == 3);
 
 	// Conversion for commented, indented
-	str = ParserData("enum potato {\n// The total\nTOTALS = 1;}");
-	enm = PBEnum(str);
-	enm.comments ~= "// My food";
-	ans = regex(r"\t/// My food\n"
+	auto str2 = ParserData("enum potato{
+                           // The total
+                           // Set to 1
+                           TOTALS = 1;}");
+	auto enm2 = PBEnum(str2);
+	enm2.comments ~= "// My food";
+	auto ans = regex(r"\t/// My food\n"
 r"\tenum potato \{\n" ~
 r"\t\t/// The total\n" ~
+r"\t\t/// Set to 1\n" ~
 r"\t\tTOTALS = \d,\n" ~
 r"\t\}");
-	assert(!enm.toD(1).match(ans).empty);
+	assert(!enm2.toD(1).match(ans).empty);
 }
 
 string genDes(PBMessage msg, int indentCount = 0) {
@@ -620,8 +620,8 @@ string toD(PBMessage msg, int indentCount = 0) {
 	auto indent = indented(indentCount);
 	string ret = "";
 	with(msg) {
-		foreach(c; comments)
-			ret ~= indent ~ (c.empty() ? "":"/") ~ c ~ "\n";
+		ret ~= addComments(comments, indentCount);
+
 		ret ~= indent~(indent.length?"static ":"")~"struct "~name~" {\n";
 		indent = indented(++indentCount);
 		ret ~= indent~"// deal with unknown fields\n";
@@ -695,6 +695,20 @@ bool isReserved(string field) {
 		if(w == field)
 			return true;
 	return false;
+}
+
+string addComments(string[] comments, int indentCount) {
+	auto code = CodeBuilder(indentCount);
+	foreach(c; comments) {
+		if(c.length > 1)
+			code.put((c[0..2] == "//") ? "/":"");
+		else
+			code.put("");
+		code.rawPut(c~"\n");
+	}
+	if(comments.empty())
+		code.put("///\n");
+	return code.finalize();
 }
 
 unittest {
