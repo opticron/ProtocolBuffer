@@ -359,7 +359,7 @@ ubyte[]ripUField(ref ubyte[]input,int wiretype) {
 /**
  * Handle packed fields.
  */
-ubyte[]toPacked(T:T[],alias serializer)(const T[] packed,int field) {
+ubyte[]toPacked(T:T[],alias serializer)(in T[] packed,int field) {
 	// zero length packed repeated fields serialize to nothing
 	if (!packed.length) return null;
 	ubyte[]ret;

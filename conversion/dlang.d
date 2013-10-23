@@ -432,7 +432,6 @@ unittest {
 	// Optional messages don't ser if missing issue #27
 	auto str = ParserData("optional SomeMessage sm = 2;");
 	child = PBChild(str);
-	import std.stdio;
 	mixin(`enum one = ParserData("message AnyLineDescriptor {
                                  optional SomeMessage m2 = 2; }");`);
 	mixin(`enum two = ParserData("message SomeMessage {}");`);
