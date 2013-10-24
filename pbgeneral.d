@@ -26,6 +26,7 @@ enum PBTypes {
 	PB_Required,
 	PB_Repeated,
 	PB_Comment,
+	PB_MultiComment,
 }
 
 // character classes for parsing
@@ -110,8 +111,13 @@ PBTypes typeNextElement(in ParserData pbstring)
 in {
 	assert(pbstring.length);
 } body {
-	// we want to check for // type comments here, since there doesn't necessarily have to be a space after the opener
-	if (pbstring.length>1 && pbstring.input[0..2] == "//") return PBTypes.PB_Comment;
+	// we want to check for // type comments here, since there doesn't
+	// necessarily have to be a space after the opener
+	if (pbstring.length>1)
+		if(pbstring.input[0..2] == "//")
+			return PBTypes.PB_Comment;
+		else if(pbstring.input[0..2] == "/*")
+			return PBTypes.PB_MultiComment;
 	int i=0;
 	version(D_Version2)
 		for(;i<pbstring.length && !isWhite(pbstring[i]);i++){}
@@ -362,5 +368,22 @@ PBOption[]ripOptions(ref ParserData pbstring) {
 	}
 	// rip off the trailing ]
 	pbstring.input.skipOver("]");
+	return ret;
+}
+
+string[] ripComment(ref ParserData pbstring) {
+	string[] ret;
+	int i = 0;
+	do {
+		i++;
+		for(;i<pbstring.length && pbstring[i] != '/';i++){}
+		if(i == pbstring.length)
+			break;
+	} while(pbstring[i-1] != '*');
+	i++;
+	auto tmp = pbstring.input[0..i];
+	pbstring = pbstring[i..pbstring.length];
+	ret = tmp.splitLines();
+	pbstring.line += ret.length - 1;
 	return ret;
 }

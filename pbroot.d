@@ -61,6 +61,10 @@ struct PBRoot {
 				if(curElementLine == storeComment.lastElementLine)
 					tryAttachComments(root, storeComment);
 				break;
+			case PBTypes.PB_MultiComment:
+				storeComment ~= ripComment(pbstring);
+				storeComment.line = pbstring.line;
+				break;
 			case PBTypes.PB_Option:
 				// rip of "option" and leading whitespace
 				pbstring.input.skipOver("option");
@@ -101,6 +105,7 @@ struct PBRoot {
 			   || storeComment.line+3 > storeComment.lastElementLine) {
 				switch(storeComment.lastElementType) {
 					case PBTypes.PB_Comment:
+					case PBTypes.PB_MultiComment:
 						break;
 					case PBTypes.PB_Message:
 						root.message_defs[$-1].comments
@@ -155,6 +160,16 @@ unittest {
 	assert(root.comments[0] == "// Openning comments");
 }
 
+// Verify multiline comments attach to root/module/package
+unittest {
+	string pbstr = "/* Openning\ncomments */
+		package openning;";
+	auto root = PBRoot(pbstr);
+	assert(root.Package == "openning");
+	assert(root.comments.length == 2);
+	assert(root.comments[0] == "/* Openning");
+	assert(root.comments[1] == "comments */");
+}
 
 unittest {
 	string pbstr = "
