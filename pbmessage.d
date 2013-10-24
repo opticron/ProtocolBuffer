@@ -100,7 +100,8 @@ struct PBMessage {
 					tryAttachComments(message, storeComment);
 				break;
 			case PBTypes.PB_MultiComment:
-				storeComment ~= ripComment(pbstring);
+				foreach(c; ripComment(pbstring))
+					storeComment ~= c;
 				storeComment.line = pbstring.line;
 				break;
 			case PBTypes.PB_Option:

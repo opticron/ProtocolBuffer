@@ -383,7 +383,10 @@ string[] ripComment(ref ParserData pbstring) {
 	i++;
 	auto tmp = pbstring.input[0..i];
 	pbstring = pbstring[i..pbstring.length];
-	ret = tmp.splitLines();
+	version(D_Version2)
+		ret = tmp.splitLines();
+	else
+		ret = tmp.splitlines();
 	pbstring.line += ret.length - 1;
 	return ret;
 }
