@@ -36,9 +36,9 @@ struct PBRoot {
 
 		// loop until the string is gone
 		while(!pbstring.input.empty()) {
-			storeComment.lastElementType = typeNextElement(pbstring);
-			storeComment.lastElementLine = pbstring.line;
-			switch(storeComment.lastElementType){
+			auto curElementType = typeNextElement(pbstring);
+			auto curElementLine = pbstring.line;
+			switch(curElementType){
 			case PBTypes.PB_Package:
 				root.Package = parsePackage(pbstring);
 				break;
@@ -57,7 +57,9 @@ struct PBRoot {
 					if(!storeComment.comments.empty())
 						storeComment ~= "";
 				storeComment ~= stripValidChars(CClass.Comment,pbstring);
-				storeComment.line = pbstring.line;
+				storeComment.line = curElementLine;
+				if(curElementLine == storeComment.lastElementLine)
+					tryAttachComments(root, storeComment);
 				break;
 			case PBTypes.PB_Option:
 				// rip of "option" and leading whitespace
@@ -84,6 +86,8 @@ struct PBRoot {
 			// rip off whitespace before looking for the next definition
 			// this needs to stay at the end
 			pbstring = stripLWhite(pbstring);
+			storeComment.lastElementType = curElementType;
+			storeComment.lastElementLine = curElementLine;
 			tryAttachComments(root, storeComment);
 
 		}

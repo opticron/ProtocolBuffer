@@ -192,7 +192,7 @@ bool isValidChar(CClass cc,char pc) {
 	default:
 		break;
 	}
-	
+
 	assert(false, "Missing switch case");
 }
 
