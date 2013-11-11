@@ -69,9 +69,9 @@ struct PBMessage {
 		// now we're ready to enter the loop and parse children
 		while(pbstring[0] != '}') {
 			// start parsing, we shouldn't have any whitespace here
-			storeComment.lastElementType = typeNextElement(pbstring);
-			storeComment.lastElementLine = pbstring.line;
-			switch(storeComment.lastElementType){
+			auto curElementType = typeNextElement(pbstring);
+			auto curElementLine = pbstring.line;
+			switch(curElementType){
 			case PBTypes.PB_Message:
 				message.message_defs ~= PBMessage(pbstring);
 				break;
@@ -95,6 +95,13 @@ struct PBMessage {
 					if(!storeComment.comments.empty())
 						storeComment ~= "";
 				storeComment ~= stripValidChars(CClass.Comment,pbstring);
+				storeComment.line = curElementLine;
+				if(curElementLine == storeComment.lastElementLine)
+					tryAttachComments(message, storeComment);
+				break;
+			case PBTypes.PB_MultiComment:
+				foreach(c; ripComment(pbstring))
+					storeComment ~= c;
 				storeComment.line = pbstring.line;
 				break;
 			case PBTypes.PB_Option:
@@ -109,39 +116,44 @@ struct PBMessage {
 			pbstring.input.skipOver(";");
 			// this needs to stay at the end
 			pbstring = stripLWhite(pbstring);
-
-			// Attach Comments to elements
-			if(!storeComment.comments.empty()) {
-				if(storeComment.line == storeComment.lastElementLine
-				   || storeComment.line+3 > storeComment.lastElementLine) {
-					switch(storeComment.lastElementType) {
-						case PBTypes.PB_Comment:
-							break;
-						case PBTypes.PB_Message:
-							message.message_defs[$-1].comments
-								= storeComment.comments;
-							goto default;
-						case PBTypes.PB_Enum:
-							message.enum_defs[$-1].comments
-								= storeComment.comments;
-							goto default;
-						case PBTypes.PB_Repeated:
-						case PBTypes.PB_Required:
-						case PBTypes.PB_Optional:
-							message.children[$-1].comments
-								= storeComment.comments;
-							goto default;
-						default:
-							storeComment.comments = null;
-					}
-				}
-			}
+			storeComment.lastElementType = curElementType;
+			storeComment.lastElementLine = curElementLine;
+			tryAttachComments(message, storeComment);
 		}
 		// rip off the }
 		pbstring.input.skipOver("}");
 		return message;
 	}
 
+	static void tryAttachComments(ref PBMessage message, ref CommentManager storeComment) {
+		// Attach Comments to elements
+		if(!storeComment.comments.empty()) {
+			if(storeComment.line == storeComment.lastElementLine
+			   || storeComment.line+3 > storeComment.lastElementLine) {
+				switch(storeComment.lastElementType) {
+					case PBTypes.PB_Comment:
+					case PBTypes.PB_MultiComment:
+						break;
+					case PBTypes.PB_Message:
+						message.message_defs[$-1].comments
+							= storeComment.comments;
+						goto default;
+					case PBTypes.PB_Enum:
+						message.enum_defs[$-1].comments
+							= storeComment.comments;
+						goto default;
+					case PBTypes.PB_Repeated:
+					case PBTypes.PB_Required:
+					case PBTypes.PB_Optional:
+						message.children[$-1].comments
+							= storeComment.comments;
+						goto default;
+					default:
+						storeComment.comments = null;
+				}
+			}
+		}
+	}
 	void ripExtenRange(ref ParserData pbstring) {
 		pbstring = pbstring["extensions".length..pbstring.length];
 		pbstring = stripLWhite(pbstring);
@@ -202,14 +214,17 @@ unittest {
 	auto str = ParserData("message Person {
 		// I comment types
 		message PhoneNumber {
+		/* Multi\n    line\n*/
 		required string number = 1;
-		// Their type of phone
-		optional PhoneType type = 2 ;
+		optional PhoneType type = 2 ;// Their type of phone
 	}}");
 
 	auto ms = PBMessage(str);
 	assert(ms.name == "Person");
 	assert(ms.message_defs[0].name == "PhoneNumber");
 	assert(ms.message_defs[0].comments[0] == "// I comment types");
+	assert(ms.message_defs[0].children[0].comments[0] == "/* Multi");
+	assert(ms.message_defs[0].children[0].comments[1] == "    line");
+	assert(ms.message_defs[0].children[0].comments[2] == "*/");
 	assert(ms.message_defs[0].children[1].comments[0] == "// Their type of phone");
 }

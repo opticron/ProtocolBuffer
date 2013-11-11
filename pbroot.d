@@ -36,9 +36,9 @@ struct PBRoot {
 
 		// loop until the string is gone
 		while(!pbstring.input.empty()) {
-			storeComment.lastElementType = typeNextElement(pbstring);
-			storeComment.lastElementLine = pbstring.line;
-			switch(storeComment.lastElementType){
+			auto curElementType = typeNextElement(pbstring);
+			auto curElementLine = pbstring.line;
+			switch(curElementType){
 			case PBTypes.PB_Package:
 				root.Package = parsePackage(pbstring);
 				break;
@@ -57,6 +57,13 @@ struct PBRoot {
 					if(!storeComment.comments.empty())
 						storeComment ~= "";
 				storeComment ~= stripValidChars(CClass.Comment,pbstring);
+				storeComment.line = curElementLine;
+				if(curElementLine == storeComment.lastElementLine)
+					tryAttachComments(root, storeComment);
+				break;
+			case PBTypes.PB_MultiComment:
+				foreach(c; ripComment(pbstring))
+					storeComment ~= c;
 				storeComment.line = pbstring.line;
 				break;
 			case PBTypes.PB_Option:
@@ -84,33 +91,40 @@ struct PBRoot {
 			// rip off whitespace before looking for the next definition
 			// this needs to stay at the end
 			pbstring = stripLWhite(pbstring);
+			storeComment.lastElementType = curElementType;
+			storeComment.lastElementLine = curElementLine;
+			tryAttachComments(root, storeComment);
 
-			// Attach Comments to elements
-			if(!storeComment.comments.empty()) {
-				if(storeComment.line == storeComment.lastElementLine
-				   || storeComment.line+3 > storeComment.lastElementLine) {
-					switch(storeComment.lastElementType) {
-						case PBTypes.PB_Comment:
-							break;
-						case PBTypes.PB_Message:
-							root.message_defs[$-1].comments
-								= storeComment.comments;
-							goto default;
-						case PBTypes.PB_Enum:
-							root.enum_defs[$-1].comments
-								= storeComment.comments;
-							goto default;
-						case PBTypes.PB_Package:
-							root.comments
-								= storeComment.comments;
-							goto default;
-						default:
-							storeComment.comments = null;
-					}
+		}
+		return root;
+	}
+
+	static void tryAttachComments(ref PBRoot root, ref CommentManager storeComment) {
+		// Attach Comments to elements
+		if(!storeComment.comments.empty()) {
+			if(storeComment.line == storeComment.lastElementLine
+			   || storeComment.line+3 > storeComment.lastElementLine) {
+				switch(storeComment.lastElementType) {
+					case PBTypes.PB_Comment:
+					case PBTypes.PB_MultiComment:
+						break;
+					case PBTypes.PB_Message:
+						root.message_defs[$-1].comments
+							= storeComment.comments;
+						goto default;
+					case PBTypes.PB_Enum:
+						root.enum_defs[$-1].comments
+							= storeComment.comments;
+						goto default;
+					case PBTypes.PB_Package:
+						root.comments
+							= storeComment.comments;
+						goto default;
+					default:
+						storeComment.comments = null;
 				}
 			}
 		}
-		return root;
 	}
 
 	static string parsePackage(ref ParserData pbstring)
@@ -137,6 +151,26 @@ struct PBRoot {
 
 }
 
+// Verify comments attach to root/module/package
+unittest {
+	string pbstr = "// Openning comments
+		package openning;";
+	auto root = PBRoot(pbstr);
+	assert(root.Package == "openning");
+	assert(root.comments.length == 1);
+	assert(root.comments[0] == "// Openning comments");
+}
+
+// Verify multiline comments attach to root/module/package
+unittest {
+	string pbstr = "/* Openning\ncomments */
+		package openning;";
+	auto root = PBRoot(pbstr);
+	assert(root.Package == "openning");
+	assert(root.comments.length == 2);
+	assert(root.comments[0] == "/* Openning");
+	assert(root.comments[1] == "comments */");
+}
 
 unittest {
 	string pbstr = "

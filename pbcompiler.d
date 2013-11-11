@@ -17,6 +17,7 @@ import std.string;
 version(D_Version2) {
 	import std.getopt;
 	import std.algorithm;
+	import std.range;
 } else
 	import ProtocolBuffer.d1support;
 
@@ -165,7 +166,8 @@ PBExtension[]getExtensions(T)(T root) {
 void writeRoots(Language lang) {
 	foreach(root;docroots) {
 		string tmp;
-		tmp = "module "~root.Package~";\n";
+		tmp ~= addComments(root.comments, 0);
+		tmp ~= "module "~root.Package~";\n";
 		// write out imports
 		foreach(imp;root.imports) {
 			tmp ~= "import "~imp~";\n";
