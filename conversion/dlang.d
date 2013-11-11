@@ -173,7 +173,7 @@ private string constructUndecided(PBChild child, int indentCount, Memory mem) {
 
 		// no need to worry about packedness here, since it can't be
 		code.putBuild("tname");
-		code.rawPut(" "~type~".Deserialize(input,false);\n");
+		code.rawPut(" "~type~"(input,false);\n");
 		code.put("} else static if (is("~type~" == enum)) {\n",
 		      Indent.close | Indent.open);
 
@@ -495,64 +495,68 @@ r"\t\}");
 }
 
 string genDes(PBMessage msg, int indentCount = 0) {
-	auto indent = indented(indentCount);
+	auto code = CodeBuilder(indentCount);
 	string ret = "";
 	with(msg) {
 		// add comments
-		ret ~= indent~"// if we're root, we can assume we own the whole string\n";
-		ret ~= indent~"// if not, the first thing we need to do is pull the length that belongs to us\n";
-		ret ~= indent~"static "~name~" Deserialize(ref ubyte[] manip, bool isroot=true) {return "~name~"(manip,isroot);}\n";
-		ret ~= indent~"this(ref ubyte[] manip,bool isroot=true) {\n";
-		indent = indented(++indentCount);
-		ret ~= indent~"ubyte[] input = manip;\n";
+		code.put("// if we're root, we can assume we own the whole string\n");
+		code.put("// if not, the first thing we need to do is pull the length that belongs to us\n");
+		code.put("static "~name~" Deserialize(ubyte[] manip) {\n", Indent.open);
+		code.put("return "~name~"(manip,true);\n");
+		code.put("}\n", Indent.close);
+		code.put("this(ubyte[] manip,bool isroot=true) {\n", Indent.open);
+		code.put("this(manip,isroot);\n");
+		code.put("}\n", Indent.close);
+		code.put("this(ref ubyte[] manip,bool isroot=true) {\n", Indent.open);
+		code.push("}\n");
+		code.put("ubyte[] input = manip;\n");
 
-		ret ~= indent~"// cut apart the input string\n";
-		ret ~= indent~"if (!isroot) {\n";
-		indent = indented(++indentCount);
-		ret ~= indent~"uint len = fromVarint!(uint)(manip);\n";
-		ret ~= indent~"input = manip[0..len];\n";
-		ret ~= indent~"manip = manip[len..$];\n";
-		indent = indented(--indentCount);
-		ret ~= indent~"}\n";
+		code.put("// cut apart the input string\n");
+		code.put("if (!isroot) {\n", Indent.open);
+		code.push("}\n");
+		code.put("uint len = fromVarint!(uint)(manip);\n");
+		code.put("input = manip[0..len];\n");
+		code.put("manip = manip[len..$];\n");
+		code.pop();
 
 		// deserialization code goes here
-		ret ~= indent~"while(input.length) {\n";
-		indent = indented(++indentCount);
-		ret ~= indent~"int header = fromVarint!(int)(input);\n";
-		ret ~= indent~"auto wireType = getWireType(header);\n";
-		ret ~= indent~"switch(getFieldNumber(header)) {\n";
+		code.put("while(input.length) {\n", Indent.open);
+		code.push("}\n");
+		code.put("int header = fromVarint!(int)(input);\n");
+		code.put("auto wireType = getWireType(header);\n");
+		code.put("switch(getFieldNumber(header)) {\n");
+		code.push("}\n");
 		//here goes the meat, handily, it is generated in the children
 		foreach(pbchild;children) {
-			ret ~= genDes(pbchild, indentCount);
+			code.rawPut(genDes(pbchild, code.indentCount));
 		}
 		foreach(pbchild;child_exten) {
-			ret ~= genDes(pbchild, indentCount, true);
+			code.rawPut(genDes(pbchild, code.indentCount, true));
 		}
 		// take care of default case
-		ret ~= indent~"default:\n";
-		ret ~= indent~"	// rip off unknown fields\n";
-		ret ~= indent~"if(input.length)\n";
-		ret ~= indented(indentCount+1)~"ufields ~= toVarint(header)~\n";
-		ret ~= indented(indentCount+1)~
-			"   ripUField(input,getWireType(header));\n";
-		ret ~= indent~"break;\n";
-		ret ~= indent~"}\n";
-		indent = indented(--indentCount);
-		ret ~= indent~"}\n";
+		code.put("default:\n", Indent.open);
+		code.push("break;\n");
+		code.put("	// rip off unknown fields\n");
+		code.put("if(input.length)\n", Indent.open);
+		code.put("ufields ~= toVarint(header)~\n");
+		code.put("   ripUField(input,getWireType(header));\n");
+		code.pop();
+		code.pop();
+		code.pop();
 
 		// check for required fields
 		foreach(pbchild;child_exten) if (pbchild.modifier == "required") {
-			ret ~= indent~"if (_has__exten_"~pbchild.name~" == false) throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n";
+			code.put("if (_has__exten_"~pbchild.name~" == false)\n", Indent.open);
+			code.put("throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n");
+			code.put(Indent.close);
 		}
 		foreach(pbchild;children) if (pbchild.modifier == "required") {
 			auto field = pbchild.name;
 			if(isReserved(field))
 				field = field ~ "_";
-			ret ~= indent~"if ("~field~".isNull) throw new Exception(\"Did not find a "~field~" in the message parse.\");\n";
+			code.put("if ("~field~".isNull) throw new Exception(\"Did not find a "~field~" in the message parse.\");\n");
 		}
-		indent = indented(--indentCount);
-		ret ~= indent~"}\n";
-		return ret;
+		return code.finalize();
 	}
 }
 
@@ -658,10 +662,6 @@ string toD(PBMessage msg, int indentCount = 0) {
 		ret ~= "\n";
 		// deal with what little we need to do for extensions
 		ret ~= extensions.genExtString(indent~"static ");
-		// include a static opcall to do deserialization to make coding simpler
-		ret ~= indent~"static "~name~" opCall(ref ubyte[]input) {\n";
-		ret ~= indent~"	return Deserialize(input);\n";
-		ret ~= indent~"}\n";
 
 		// guaranteed to work, since we tack on a tab earlier
 		indent = indented(--indentCount);
@@ -754,7 +754,7 @@ unittest {
 	ubyte[] feed = [0x12,0x07, // (tag 2, type 2) (length 7)
 		0x74,0x65,0x73,0x74,0x69,0x6e,0x67
 			]; // From example
-	auto t2 = Test2(feed);
+	auto t2 = Test2(feed[]);
 	assert(t2.b == "testing");
 	assert(t2.Serialize() == feed);
 }
