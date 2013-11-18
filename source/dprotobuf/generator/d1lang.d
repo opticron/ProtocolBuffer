@@ -2,15 +2,15 @@
  * This module provides conversion functionality of different elements
  * to the D Programming Language which are campatible with version 1.
  */
-module ProtocolBuffer.conversion.d1lang;
+module dprotobuf.generator.d1lang;
 
-import ProtocolBuffer.pbroot;
-import ProtocolBuffer.pbgeneral;
-import ProtocolBuffer.pbchild;
-import ProtocolBuffer.pbenum;
-import ProtocolBuffer.pbmessage;
-import ProtocolBuffer.conversion.common;
-import ProtocolBuffer.conversion.pbbinary;
+import dprotobuf.pbroot;
+import dprotobuf.pbgeneral;
+import dprotobuf.pbchild;
+import dprotobuf.pbenum;
+import dprotobuf.pbmessage;
+import dprotobuf.wireformat;
+import dprotobuf.generator.common;
 
 version(D_Version2) {
 	import std.algorithm;
@@ -30,8 +30,7 @@ version(D_Version2) {
 		}
     }`);
 
-} else
-	import ProtocolBuffer.d1support;
+}
 
 import std.conv;
 import std.string : format;

@@ -1,12 +1,12 @@
 module pbcompiler;
 // compiler for .proto protocol buffer definition files that generates D code
 //
-import ProtocolBuffer.pbroot;
-import ProtocolBuffer.pbextension;
-import ProtocolBuffer.pbmessage;
-import ProtocolBuffer.pbgeneral;
-import ProtocolBuffer.conversion.d1lang;
-import ProtocolBuffer.conversion.dlang;
+import dprotobuf.pbroot;
+import dprotobuf.pbextension;
+import dprotobuf.pbmessage;
+import dprotobuf.pbgeneral;
+import dprotobuf.generator.d1lang;
+import dprotobuf.generator.dlang;
 
 import std.conv;
 import std.file;
@@ -19,7 +19,7 @@ version(D_Version2) {
 	import std.algorithm;
 	import std.range;
 } else
-	import ProtocolBuffer.d1support;
+	import dprotobuf.d1support;
 
 // our tree of roots to play with, so that we can apply multiple extensions to a given document
 PBRoot[string] docroots;

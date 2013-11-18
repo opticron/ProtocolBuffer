@@ -1,17 +1,17 @@
 // this file implements the structures and lexer for the protocol buffer format
 // required to parse a protocol buffer file or tree and generate
 // code to read and write the specified format
-module ProtocolBuffer.pbroot;
-import ProtocolBuffer.pbgeneral;
-import ProtocolBuffer.pbmessage;
-import ProtocolBuffer.pbenum;
-import ProtocolBuffer.pbextension;
+module dprotobuf.pbroot;
+import dprotobuf.pbgeneral;
+import dprotobuf.pbmessage;
+import dprotobuf.pbenum;
+import dprotobuf.pbextension;
 
 version(D_Version2) {
 	import std.algorithm;
 	import std.range;
 } else
-	import ProtocolBuffer.d1support;
+	import dprotobuf.d1support;
 
 import std.string;
 import std.stdio;

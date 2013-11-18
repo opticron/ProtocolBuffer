@@ -1,12 +1,12 @@
 // this file implements the structures and lexer for the protocol buffer format
 // required to parse a protocol buffer file or tree and generate
 // code to read and write the specified format
-module ProtocolBuffer.pbgeneral;
+module dprotobuf.pbgeneral;
 version(D_Version2) {
 	import std.algorithm;
 	import std.range;
 } else
-	import ProtocolBuffer.d1support;
+	import dprotobuf.d1support;
 
 import std.stdio;
 import std.string;
@@ -113,11 +113,12 @@ in {
 } body {
 	// we want to check for // type comments here, since there doesn't
 	// necessarily have to be a space after the opener
-	if (pbstring.length>1)
+	if (pbstring.length>1) {
 		if(pbstring.input[0..2] == "//")
 			return PBTypes.PB_Comment;
 		else if(pbstring.input[0..2] == "/*")
 			return PBTypes.PB_MultiComment;
+    }
 	int i=0;
 	version(D_Version2)
 		for(;i<pbstring.length && !isWhite(pbstring[i]);i++){}

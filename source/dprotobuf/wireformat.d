@@ -2,12 +2,12 @@
  * This module provides the functions needed to convert to/from
  * the Protocol Buffer binary format.
  */
-module ProtocolBuffer.conversion.pbbinary;
+module dprotobuf.wireformat;
 
 version(D_Version2) {
 	import std.conv;
 } else
-	import ProtocolBuffer.d1support;
+	public import dprotobuf.d1support;
 
 import std.stdio;
 

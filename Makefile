@@ -1,18 +1,21 @@
 dc?=dmd
-Generator=conversion/common.d conversion/d1lang.d\
-          conversion/dlang.d pbchild.d pbenum.d pbextension.d pbgeneral.d\
-          pbmessage.d pbroot.d
+Generator=source/dprotobuf/generator/common.d\
+          source/dprotobuf/generator/d1lang.d\
+          source/dprotobuf/generator/dlang.d\
+			 source/dprotobuf/pbchild.d source/dprotobuf/pbenum.d\
+			 source/dprotobuf/pbextension.d source/dprotobuf/pbgeneral.d\
+          source/dprotobuf/pbmessage.d source/dprotobuf/pbroot.d
 
 
-Library=conversion/pbbinary.d d1support.d
+Library=source/dprotobuf/wireformat.d source/dprotobuf/d1support.d
 
 all: libdprotobuf pbcompiler
 
-libdprotobuf: $(Library)
+libdprotobuf: $(Library) $(Generator)
 	$(dc) $(args) -O -release -lib -oflibdprotobuf $^
 
-pbcompiler: pbcompiler.d $(Generator) $(Library)
-	$(dc) $(args) $^
+pbc: pbcompiler/source/app.d $(Generator) $(Library)
+	$(dc) $(args) -ofpbc $^
 	
 clean:
-	rm -rf *.o *.a pbcompiler
+	rm *.o *.a
