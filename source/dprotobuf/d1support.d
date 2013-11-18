@@ -1,4 +1,4 @@
-module ProtocolBuffer.d1support;
+module dprotobuf.d1support;
 
 import std.string;
 

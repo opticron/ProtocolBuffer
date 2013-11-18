@@ -1,7 +1,7 @@
 /**
  * Provides common functions during language conversion.
  */
-module ProtocolBuffer.conversion.common;
+module dprotobuf.generator.common;
 
 version(D_Version2) {
 	import std.algorithm;
@@ -10,7 +10,7 @@ version(D_Version2) {
 	import std.regex;
 } else {
 	import std.string;
-	import ProtocolBuffer.d1support;
+	import dprotobuf.d1support;
 }
 
 /*

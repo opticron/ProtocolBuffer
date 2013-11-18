@@ -1,7 +1,7 @@
 // this code implements the ability to extend messages
-module ProtocolBuffer.pbextension;
-import ProtocolBuffer.pbchild;
-import ProtocolBuffer.pbgeneral;
+module dprotobuf.pbextension;
+import dprotobuf.pbchild;
+import dprotobuf.pbgeneral;
 import std.string;
 import std.stdio;
 
