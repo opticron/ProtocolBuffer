@@ -1,0 +1,10 @@
+{
+	"name": "pbcompiler",
+	"targetType": "executable",
+	"description": "Compiler for protocol puffers",
+	"homepage": "https://github.com/opticron/ProtocolBuffer",
+	"license": "BSL-1.0",
+	"dependencies": {
+		"dprotobuf": {"version": "~master", "path": "../"}
+	},
+}
