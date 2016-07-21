@@ -1,0 +1,14 @@
+name "protocolbuffer"
+targetType "library"
+description "A backend library for the implementation of a ProtocolBuffer compiler."
+homepage "https://github.com/opticron/ProtocolBuffer"
+license "BSL-1.0"
+
+configuration "dprotobuf" {
+		targetName "dprotobuf"
+		targetType "library"
+}
+configuration "pbcompiler" {
+		targetName "pbcompiler"
+		targetType "executable"
+}
