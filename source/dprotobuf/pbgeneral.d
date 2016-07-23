@@ -365,6 +365,7 @@ PBOption[]ripOptions(ref ParserData pbstring) {
 		// this will rip off the leading [ and intermediary ','s
 		pbstring = pbstring[1..pbstring.length];
 		ret ~= ripOption(pbstring,",]");
+		if(__ctfe) {} else
 		debug writefln("Pulled option %s with value %s",ret[$-1].name,ret[$-1].value);
 	}
 	// rip off the trailing ]

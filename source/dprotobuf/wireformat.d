@@ -396,7 +396,7 @@ unittest {
 	ubyte[]tmp = toPacked!(int[],toVarint)(test,cast(ubyte)4);
 	assert(tmp.length == 8);
 	version(D_Version2) {
-		mixin("import std.algorithm, std.range;");
+		mixin("import std.algorithm, std.range, std.string;");
 		debug writeln(map!((a) { return format("%x", a); })(cmp));
 		debug writeln(map!((a) { return format("%x", a); })(tmp));
 	} else {

@@ -45,7 +45,7 @@ private string typeWrapper(PBChild child) {
 
 string langD(PBRoot root) {
 	auto code = CodeBuilder(0);
-    code.put("import ProtocolBuffer.conversion.pbbinary;\n");
+    code.put("import dprotobuf.wireformat;\n");
     code.put("import std.conv;\n");
     code.put("import std.typecons;\n\n");
 
@@ -105,7 +105,7 @@ unittest {
 	auto str = ParserData("optional HeaderBBox bbox = 1;");
 	child = PBChild(str);
 	string ans = "///\nNullable!(HeaderBBox) bbox;";
-	assert(toD(child) == ans);
+	assert(toD(child) == ans, toD(child));
 
 	// Conversion for repeated
 	str = ParserData("repeated HeaderBBox bbox = 1;");
@@ -433,7 +433,7 @@ unittest {
 	mixin(`enum two = ParserData("message SomeMessage {}");`);
 	mixin(`enum ichi = PBCompileTime(one);`);
 	mixin(`enum ni = PBCompileTime(two);`);
-	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import dprotobuf.wireformat;`);
 	mixin(`import std.typecons;`);
 	mixin("static " ~ ni.toD);
 	mixin("static " ~ ichi.toD);
@@ -469,7 +469,7 @@ unittest {
 	mixin(`enum str = ParserData("enum potato
                                  {TOTALS = 1;JUNK= 5 ; ALL =3;}");`);
 	mixin(`enum enm = PBCTEnum(str);`);
-	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import dprotobuf.wireformat;`);
 	mixin(`import std.typecons;`);
 	mixin(enm.toD);
 	assert(potato.TOTALS == 1);
@@ -718,7 +718,7 @@ unittest {
 	// Conversion for optional
 	mixin(`enum str = ParserData("message Test1 { required int32 a = 1; }");`);
 	mixin(`enum msg = PBCompileTime(str);`);
-	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import dprotobuf.wireformat;`);
 	mixin(`import std.typecons;`);
 	mixin("static " ~ msg.toD);
 	ubyte[] feed = [0x08,0x96,0x01]; // From example
@@ -740,7 +740,7 @@ unittest {
 	mixin(`enum str = ParserData("message Test4 {
 	                              repeated int32 d = 4 [packed=true]; }");`);
 	mixin(`enum msg = PBCompileTime(str);`);
-	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import dprotobuf.wireformat;`);
 	mixin(`import std.typecons;`);
 	mixin("static " ~ msg.toD);
 	ubyte[] feed = [0x22, // Tag (field number 4, wire type 2)
@@ -760,7 +760,7 @@ unittest {
 	mixin(`enum str = ParserData("message Test2 {
 	                              required string b = 2; }");`);
 	mixin(`enum msg = PBCompileTime(str);`);
-	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import dprotobuf.wireformat;`);
 	mixin(`import std.typecons;`);
 	mixin("static " ~ msg.toD);
 	ubyte[] feed = [0x12,0x07, // (tag 2, type 2) (length 7)
@@ -778,7 +778,7 @@ unittest {
 	                              repeated string b = 2;
 	                              repeated string c = 3; }");`);
 	mixin(`enum msg = PBCompileTime(str);`);
-	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import dprotobuf.wireformat;`);
 	mixin(`import std.typecons;`);
 	mixin("static " ~ msg.toD);
 	ubyte[] feed = [0x09,(2<<3) | 2,0x07,
@@ -800,7 +800,7 @@ unittest {
 	                              repeated MyNum b = 2 [packed=true]; }");`);
 	mixin(`enum msg = PBCompileTime(str);`);
 	mixin(`enum yum = PBCTEnum(um);`);
-	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import dprotobuf.wireformat;`);
 	mixin(`import std.typecons;`);
 	mixin(yum.toD);
 	mixin("static " ~ msg.toD);
@@ -835,7 +835,7 @@ unittest {
 	mixin(`enum ichi = PBCTEnum(one);`);
 	mixin(`enum ni = PBCompileTime(two);`);
 	mixin(`enum san = PBCompileTime(three);`);
-	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import dprotobuf.wireformat;`);
 	mixin(`import std.typecons;`);
 	mixin(ichi.toD);
 	mixin("static " ~ ni.toD);

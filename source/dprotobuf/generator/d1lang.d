@@ -730,7 +730,7 @@ unittest {
 	// Conversion for optional
 	mixin(`enum str = ParserData("message Test1 { required int32 a = 1; }");`);
 	mixin(`enum msg = PBCompileTime(str);`);
-	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import dprotobuf.wireformat;`);
 	mixin(`import std.typecons;`);
 	mixin("static " ~ msg.toD1);
 	ubyte[] feed = [0x08,0x96,0x01]; // From example
@@ -751,7 +751,7 @@ unittest {
 	mixin(`enum str = ParserData("message Test4 {
 	                              repeated int32 d = 4 [packed=true]; }");`);
 	mixin(`enum msg = PBCompileTime(str);`);
-	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import dprotobuf.wireformat;`);
 	mixin(`import std.typecons;`);
 	mixin("static " ~ msg.toD1);
 	ubyte[] feed = [0x22, // Tag (field number 4, wire type 2)
@@ -771,7 +771,7 @@ unittest {
 	mixin(`enum str = ParserData("message Test2 {
 	                              required string b = 2; }");`);
 	mixin(`enum msg = PBCompileTime(str);`);
-	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import dprotobuf.wireformat;`);
 	mixin(`import std.typecons;`);
 	mixin("static " ~ msg.toD1);
 	ubyte[] feed = [0x12,0x07, // (tag 2, type 2) (length 7)
@@ -789,7 +789,7 @@ unittest {
 	                              repeated string b = 2;
 	                              repeated string c = 3; }");`);
 	mixin(`enum msg = PBCompileTime(str);`);
-	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import dprotobuf.wireformat;`);
 	mixin(`import std.typecons;`);
 	mixin("static " ~ msg.toD1);
 	ubyte[] feed = [0x09,(2<<3) | 2,0x07,
@@ -811,7 +811,7 @@ unittest {
 	                              repeated MyNum b = 2 [packed=true]; }");`);
 	mixin(`enum msg = PBCompileTime(str);`);
 	mixin(`enum yum = PBCTEnum(um);`);
-	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import dprotobuf.wireformat;`);
 	mixin(`import std.typecons;`);
 	mixin(yum.toD1);
 	mixin("static " ~ msg.toD1);
@@ -846,7 +846,7 @@ unittest {
 	mixin(`enum ichi = PBCTEnum(one);`);
 	mixin(`enum ni = PBCompileTime(two);`);
 	mixin(`enum san = PBCompileTime(three);`);
-	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import dprotobuf.wireformat;`);
 	mixin(`import std.typecons;`);
 	mixin(ichi.toD1);
 	mixin("static " ~ ni.toD1);
@@ -889,7 +889,7 @@ unittest {
 	                              repeated string version = 1;
 	                              optional string enum = 2; }");`);
 	mixin(`enum msg = PBCompileTime(str);`);
-	mixin(`import ProtocolBuffer.conversion.pbbinary;`);
+	mixin(`import dprotobuf.wireformat;`);
 	mixin(`import std.typecons;`);
 	mixin("static " ~ msg.toD1);
 	//auto t2 = new Test2(feed);
