@@ -4,9 +4,15 @@ description "A backend library for the implementation of a ProtocolBuffer compil
 homepage "https://github.com/opticron/ProtocolBuffer"
 license "BSL-1.0"
 
+dependency "codebuilder" version="~>0.5.2"
+
 configuration "dprotobuf" {
 		targetName "dprotobuf"
 		targetType "library"
+}
+configuration "unittest" {
+		excludedSourceFiles "source/app.d"
+		subConfiguration "codebuilder" "Testing"
 }
 configuration "pbcompiler" {
 		targetName "pbcompiler"

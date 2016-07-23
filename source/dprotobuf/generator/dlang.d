@@ -10,7 +10,7 @@ import dprotobuf.pbchild;
 import dprotobuf.pbenum;
 import dprotobuf.pbmessage;
 import dprotobuf.wireformat;
-import dprotobuf.generator.common;
+import codebuilder.structure;
 
 version(D_Version2) {
 	import std.algorithm;
