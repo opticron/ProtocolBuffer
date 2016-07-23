@@ -50,7 +50,7 @@ private string typeWrapper(PBChild child) {
 
 string langD1(PBRoot root) {
 	auto code = CodeBuilder(0);
-    code.put("import ProtocolBuffer.conversion.pbbinary;\n");
+    code.put("import dprotobuf.wireformat;\n");
     code.put("import std.string;\n\n");
 
     code.put("version(D_Version2) {\n");
