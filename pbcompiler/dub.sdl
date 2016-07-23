@@ -1,0 +1,6 @@
+name "pbcompiler"
+targetName "pbcompiler"
+targetType "executable"
+
+dependency "protocolbuffer" version="*"
+subConfiguration "protocolbuffer" "pbcompiler"

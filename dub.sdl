@@ -4,7 +4,11 @@ description "A backend library for the implementation of a ProtocolBuffer compil
 homepage "https://github.com/opticron/ProtocolBuffer"
 license "BSL-1.0"
 
+subPackage "pbcompiler"
+subPackage "wireformat"
+
 dependency "codebuilder" version="~>0.5.2"
+dependency "protocolbuffer:wireformat" version="*"
 
 configuration "dprotobuf" {
 		targetName "dprotobuf"
@@ -15,6 +19,7 @@ configuration "unittest" {
 		subConfiguration "codebuilder" "Testing"
 }
 configuration "pbcompiler" {
-		targetName "pbcompiler"
-		targetType "executable"
+		targetName "dprotobuf"
+		targetType "library"
+		subConfiguration "codebuilder" "Testing"
 }
