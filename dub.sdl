@@ -7,7 +7,7 @@ license "BSL-1.0"
 subPackage "pbcompiler"
 subPackage "wireformat"
 
-dependency "codebuilder" version="~>0.5.2"
+dependency "codebuilder" version="~>0.6.1"
 dependency "protocolbuffer:wireformat" version="*"
 
 configuration "dprotobuf" {
@@ -16,10 +16,10 @@ configuration "dprotobuf" {
 }
 configuration "unittest" {
 		excludedSourceFiles "source/app.d"
-		subConfiguration "codebuilder" "Testing"
+		subConfiguration "codebuilder" "FileWriter"
 }
 configuration "pbcompiler" {
 		targetName "dprotobuf"
 		targetType "library"
-		subConfiguration "codebuilder" "Testing"
+		subConfiguration "codebuilder" "FileWriter"
 }
