@@ -15,11 +15,10 @@ configuration "dprotobuf" {
 		targetType "library"
 }
 configuration "unittest" {
-		excludedSourceFiles "source/app.d"
 		subConfiguration "codebuilder" "FileWriter"
 }
 configuration "pbcompiler" {
-		targetName "dprotobuf"
-		targetType "library"
+		targetName "pbcompiler"
+		targetType "executable"
 		subConfiguration "codebuilder" "FileWriter"
 }
