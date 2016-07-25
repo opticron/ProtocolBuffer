@@ -166,7 +166,7 @@ PBExtension[]getExtensions(T)(T root) {
 void writeRoots(Language lang) {
 	foreach(root;docroots) {
 		string tmp;
-		tmp ~= addComments(root.comments, 0);
+		tmp ~= addComments(root.comments).finalize();
 		tmp ~= "module "~root.Package~";\n";
 		// write out imports
 		foreach(imp;root.imports) {

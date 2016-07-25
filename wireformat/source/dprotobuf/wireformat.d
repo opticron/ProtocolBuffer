@@ -6,8 +6,42 @@ module dprotobuf.wireformat;
 
 version(D_Version2) {
 	import std.conv;
-} else
-	public import dprotobuf.d1support;
+} else {
+	import std.string;
+	int to(T)(string v) {
+		return atoi(v);
+	}
+
+	string to(T)(int v) {
+		return toString(v);
+	}
+
+	string to(T, S)(ulong v, S redix) {
+		return toString(v, redix);
+	}
+
+	bool empty(T)(T[] v) {
+		return !v.length;
+	}
+
+	T back(T)(T[] arr) {
+		return arr[$-1];
+	}
+
+	void popBack(T)(ref T[] arr) {
+		arr = arr[0..$-1];
+	}
+
+	bool skipOver(ref string str, string c) {
+		if(str.length < c.length) return false;
+
+		if(str[0..c.length] == c) {
+			str = str[c.length..$];
+			return true;
+		}
+		return false;
+	}
+}
 
 import std.stdio;
 
@@ -396,7 +430,7 @@ unittest {
 	ubyte[]tmp = toPacked!(int[],toVarint)(test,cast(ubyte)4);
 	assert(tmp.length == 8);
 	version(D_Version2) {
-		mixin("import std.algorithm, std.range;");
+		mixin("import std.algorithm, std.range, std.string;");
 		debug writeln(map!((a) { return format("%x", a); })(cmp));
 		debug writeln(map!((a) { return format("%x", a); })(tmp));
 	} else {
