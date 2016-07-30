@@ -38,9 +38,9 @@ import std.string : format;
  */
 private string typeWrapper(PBChild child) {
 	if(child.modifier == "repeated")
-		return format("Nullable!(%s[])", toDType(child.type));
+		return format("Nullable!(%s[]) ", toDType(child.type));
 	else
-		return format("Nullable!(%s)", toDType(child.type));
+		return format("Nullable!(%s) ", toDType(child.type));
 }
 
 string langD(PBRoot root) {
@@ -78,7 +78,6 @@ string toD(PBChild child, int indentCount = 0) {
 		if(is_dep) code.put("deprecated ref ");
 		else code.put("");
 		code.rawPut(typeWrapper(child));
-		code.rawPut(" ");
 		code.rawPut(name);
 		if(isReserved(name))
 			code.rawPut("_");
@@ -89,7 +88,7 @@ string toD(PBChild child, int indentCount = 0) {
 			code.pop();
 			code.put("private ");
 			code.rawPut(typeWrapper(child));
-			code.put(" " ~ name ~ "_dep");
+			code.put(name ~ "_dep");
 		}
 		if(!empty(valdefault)) // Apply default value
 			code.rawPut(" = " ~ valdefault);
