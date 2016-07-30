@@ -13,9 +13,11 @@ dependency "protocolbuffer:wireformat" version="*"
 configuration "dprotobuf" {
 		targetName "dprotobuf"
 		targetType "library"
+		excludedSourceFiles "source/app.d"
 }
 configuration "unittest" {
 		subConfiguration "codebuilder" "FileWriter"
+		excludedSourceFiles "source/app.d"
 }
 configuration "pbcompiler" {
 		targetName "pbcompiler"

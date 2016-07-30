@@ -180,20 +180,107 @@ unittest {
 	// Conversion for default value
 	str = ParserData("required int64 value = 1 [default=6]; ");
 	child = PBChild(str);
-    assert(child.toD1().startsWith(r"long _value = 6;"));
+	assert(child.toD1().startsWith(r"long _value = 6;"));
 
 	// Conversion for default, negative, deprecated value
 	str = ParserData("optional int64 value = 1 [default=-32,deprecated=true];");
 	child = PBChild(str);
-    assert(child.toD1().startsWith(r"long _value = -32;"));
-    assert(!child.toD1().find(r"deprecated long value()").empty);
+	assert(child.toD1().startsWith(r"long _value = -32;"));
+	assert(!child.toD1().find(r"deprecated long value()").empty);
 
 	// Conversion for commented, indented
 	str = ParserData("optional HeaderBBox bbox = 1;");
 	child = PBChild(str);
 	child.comments ~= "// This is a comment";
-    assert(!child.toD1().find(r"/// This is a comment").empty);
-    assert(!child.toD1().find(r"/// ditto").empty);
+	assert(!child.toD1().find(r"/// This is a comment").empty);
+	assert(!child.toD1().find(r"/// ditto").empty);
+}
+
+CodeBuilder genExtenCode(PBChild child, int indentCount) {
+    auto code = CodeBuilder(indentCount);
+    with(child) {
+        auto extName = "__exten_"~name;
+
+        if(is_dep) code.put("deprecated ");
+        else code.put("");
+        code.rawPut(typeWrapper(child));
+        code.rawPut(extName);
+        if(!empty(valdefault)) // Apply default value
+            code.rawPut(" = " ~ valdefault);
+        code.rawPut(";\n");
+
+        // get accessor
+        if(is_dep) code.put("deprecated ");
+        else code.put("");
+        code.rawPut(toDType(type));
+        code.rawPut("GetExtension(int T:");
+        code.rawPut(to!(string)(index)~")() {\n", Indent.open);
+        code.put("return "~extName~";\n");
+        code.put("}\n", Indent.close);
+        // set accessor
+        if(is_dep) code.put("deprecated ");
+        else code.put("");
+        code.rawPut("void SetExtension(int T:");
+        code.rawPut(to!(string)(index)~")("~toDType(type)~"input_var) {\n");
+        code.put(Indent.open);
+        code.put(extName~" = input_var;\n");
+        if (modifier != "repeated")
+            code.put("_has"~extName~" = true;\n");
+        code.put("}\n", Indent.close);
+
+        if (modifier == "repeated") {
+            if(is_dep) code.put("deprecated ");
+            else code.put("");
+            code.rawPut("bool HasExtension(int T:");
+            code.rawPut(to!(string)(index)~")() {\n", Indent.open);
+            code.put("return !"~extName~".isNull;\n");
+            code.put("}\n", Indent.close);
+            if(is_dep) code.put("deprecated ");
+            else code.put("");
+            code.rawPut("void ClearExtension(int T:");
+            code.rawPut(to!(string)(index)~")() {\n", Indent.open);
+            code.put(extName~" = null;\n");
+            code.put("}\n", Indent.close);
+            // technically, they can just do class.item.length
+            // there is no need for this
+            if(is_dep) code.put("deprecated ");
+            else code.put("");
+            code.rawPut("int ExtensionSize(int T:");
+            code.rawPut(to!(string)(index)~")() {\n", Indent.open);
+            code.put("return "~extName~".length;\n");
+            code.put("}\n", Indent.close);
+            // functions to do additions, both singular and array
+            if(is_dep) code.put("deprecated ");
+            else code.put("");
+            code.rawPut("void AddExtension(int T:");
+            code.rawPut(to!(string)(index)~")("~toDType(type)~" __addme) {\n");
+            code.put(Indent.open);
+            code.put(extName~" ~= __addme;\n");
+            code.put("}\n", Indent.close);
+            if(is_dep) code.put("deprecated ");
+            else code.put("");
+            code.rawPut("void AddExtension(int T:");
+            code.rawPut(to!(string)(index)~")("~toDType(type)~"[]__addme) {\n");
+            code.put(Indent.open);
+            code.put(extName~" ~= __addme;\n");
+            code.put("}\n", Indent.close);
+        } else {
+            code.put("bool _has"~extName~" = false;\n");
+            if(is_dep) code.put("deprecated ");
+            else code.put("");
+            code.rawPut("bool HasExtension(int T:");
+            code.rawPut(to!(string)(index)~")() {\n", Indent.open);
+            code.put("return _has"~extName~";\n");
+            code.put("}\n", Indent.close);
+            if(is_dep) code.put("deprecated ");
+            else code.put("");
+            code.rawPut("void ClearExtension(int T:");
+            code.rawPut(to!(string)(index)~")() {\n", Indent.open);
+            code.put("_has"~extName~" = false;\n");
+            code.put("}\n", Indent.close);
+        }
+        return code;
+    }
 }
 
 private string constructMismatchException(string type, int indentCount) {
@@ -672,7 +759,7 @@ string toD1(PBMessage msg, int indentCount = 0) {
 		}
 		// last, do the extension instantiations
 		foreach(pbchild;child_exten) {
-			ret ~= pbchild.genExtenCode(indent);
+			ret ~= genExtenCode(pbchild, indentCount).finalize;
 			ret ~= "\n";
 		}
 		ret ~= "\n";

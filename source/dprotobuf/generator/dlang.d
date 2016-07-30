@@ -38,12 +38,14 @@ import std.string : format;
  */
 private string typeWrapper(PBChild child) {
 	if(child.modifier == "repeated")
-		return format("Nullable!(%s[])", toDType(child.type));
+		return format("Nullable!(%s[]) ", toDType(child.type));
 	else
-		return format("Nullable!(%s)", toDType(child.type));
+		return format("Nullable!(%s) ", toDType(child.type));
 }
 
-string langD(PBRoot root) {
+private enum extenPrefix = "extension_";
+
+string langD(PBRoot root, bool markMessagesAsStatic = false) {
 	auto code = CodeBuilder(0);
     code.put("import dprotobuf.wireformat;\n");
     code.put("import std.conv;\n");
@@ -61,7 +63,7 @@ string langD(PBRoot root) {
     }
     // write out message definitions
     foreach(pbmsg; root.message_defs) {
-        code.put(toD(pbmsg, 0));
+        code.put(toD(pbmsg, 0, markMessagesAsStatic));
     }
     return code.finalize();
 }
@@ -78,7 +80,6 @@ string toD(PBChild child, int indentCount = 0) {
 		if(is_dep) code.put("deprecated ref ");
 		else code.put("");
 		code.rawPut(typeWrapper(child));
-		code.rawPut(" ");
 		code.rawPut(name);
 		if(isReserved(name))
 			code.rawPut("_");
@@ -89,7 +90,7 @@ string toD(PBChild child, int indentCount = 0) {
 			code.pop();
 			code.put("private ");
 			code.rawPut(typeWrapper(child));
-			code.put(" " ~ name ~ "_dep");
+			code.put(name ~ "_dep");
 		}
 		if(!empty(valdefault)) // Apply default value
 			code.rawPut(" = " ~ valdefault);
@@ -139,6 +140,23 @@ unittest {
 	child.comments ~= "// This is a comment";
 	ans = "\t/// This is a comment\n\tNullable!(HeaderBBox) bbox;";
 	assert(toD(child, 1) == ans);
+}
+
+CodeBuilder genExtenCode(PBChild child, int indentCount) {
+	auto code = CodeBuilder(indentCount);
+	with(child) {
+		auto extName = extenPrefix~name;
+
+		if(is_dep) code.put("deprecated ");
+		else code.put("");
+		code.rawPut(typeWrapper(child));
+		code.rawPut(extName);
+		if(!empty(valdefault)) // Apply default value
+			code.rawPut(" = " ~ valdefault);
+		code.rawPut(";\n");
+
+		return code;
+	}
 }
 
 private string constructMismatchException(string type, int indentCount) {
@@ -204,7 +222,7 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 
       auto tnameCode = CodeBuilder(0);
 		string tname = name;
-		if (is_exten) tname = "__exten"~tname;
+		if (is_exten) tname = extenPrefix~tname;
 		if (is_dep) tname ~= "_dep";
 		if(isReserved(tname)) {
 			tname = tname ~ "_";
@@ -323,7 +341,7 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			customType = true;
 			break;
 		}
-		auto tname = (is_exten?"__exten":"") ~ name;
+		auto tname = (is_exten?extenPrefix:"") ~ name;
 
 		if(is_dep) tname ~= "_dep";
 		if(isReserved(tname))
@@ -543,7 +561,7 @@ string genDes(PBMessage msg, int indentCount = 0) {
 
 		// check for required fields
 		foreach(pbchild;child_exten) if (pbchild.modifier == "required") {
-			code.put("if (_has__exten_"~pbchild.name~" == false)\n", Indent.open);
+			code.put("if ("~extenPrefix~pbchild.name~".isNull)\n", Indent.open);
 			code.put("throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n");
 			code.put(Indent.close);
 		}
@@ -617,13 +635,13 @@ string genMerge(PBMessage msg, int indentCount = 0) {
 
 /**
  */
-string toD(PBMessage msg, int indentCount = 0) {
+string toD(PBMessage msg, int indentCount = 0, bool staticChild = false) {
 	auto indent = indented(indentCount);
 	string ret = "";
 	with(msg) {
 		ret ~= addComments(comments).finalize();
 
-		ret ~= indent~(indent.length?"static ":"")~"struct "~name~" {\n";
+		ret ~= indent~(staticChild?"static ":"")~"struct "~name~" {\n";
 		indent = indented(++indentCount);
 		ret ~= indent~"// deal with unknown fields\n";
 		ret ~= indent~"ubyte[] ufields;\n";
@@ -635,7 +653,7 @@ string toD(PBMessage msg, int indentCount = 0) {
 		}
 		// now, we'll do the nested messages
 		foreach(pbmsg;message_defs) {
-			ret ~= toD(pbmsg, indentCount);
+			ret ~= toD(pbmsg, indentCount, true);
 			ret ~= "\n\n";
 		}
 		// do the individual instantiations
@@ -645,7 +663,7 @@ string toD(PBMessage msg, int indentCount = 0) {
 		}
 		// last, do the extension instantiations
 		foreach(pbchild;child_exten) {
-			ret ~= pbchild.genExtenCode(indent);
+			ret ~= genExtenCode(pbchild, indentCount).finalize;
 			ret ~= "\n";
 		}
 		ret ~= "\n";
@@ -868,4 +886,24 @@ unittest {
 
 	auto res = ot.Serialize();
 	assert(res == feed);
+}
+
+unittest {
+	enum foo =
+ParserData("message Foo {
+	optional int32 de = 5;
+	extensions 1 to 4;
+}
+extend Foo {
+	optional int32 blah = 1;
+    repeated string da = 2;
+}
+");
+
+	enum root = PBRoot(foo);
+	enum ExtFoo = root.getExtensions();
+
+	mixin(applyExtensions(root, ExtFoo).langD(true));
+    Foo m;
+    m.extension_blah = 5;
 }

@@ -105,23 +105,10 @@ int applyExtension(string imp,PBExtension ext) {
 	}
 	// we have something we might want to apply it to! this is exciting!
 	// make sure it's within the allowed extensions
-	foreach(echild;ext.children) {
-		bool extmatch = false;
-		foreach(exten;dst.exten_sets) {
-			if (echild.index <= exten.max && echild.index >= exten.min) {
-				extmatch = true;
-				break;
-			}
-		}
-		if (!extmatch) throw new Exception("The field number "~to!(string)(echild.index)~" for extension "~echild.name~" is not within a valid extension range for "~dst.name);
-	}
-	// now check each child vs each extension already applied to see if there are conflicts
-	foreach(dchild;dst.child_exten) foreach(echild;ext.children) {
-		if (dchild.index == echild.index) throw new Exception("Extensions "~dchild.name~" and "~echild.name~" to "~dst.name~" have identical index number "~to!(string)(dchild.index));
-	}
+	*dst = insertExtension(*dst, ext);
+
 	// it looks like we have a match!
 	writefln("Applying extensions to %s",dst.name);
-	dst.child_exten ~= ext.children;
 	return 1;
 }
 
@@ -129,37 +116,6 @@ int applyExtension(string imp,PBExtension ext) {
 PBMessage*findMessage(string impstr,string message) {
 	PBRoot root = docroots[impstr];
 	return searchMessages(root, ParserData(message));
-}
-
-PBMessage*searchMessages(T)(ref T root, ParserData message)
-in {
-	assert(message.length);
-} body {
-	string name = stripValidChars(CClass.Identifier,message);
-	if (message.length) {
-		// rip off the leading .
-		message = message[1..message.length];
-	}
-	// this is terminal, so run through the children to find a match
-	foreach(ref msg;root.message_defs) {
-		if (msg.name == name) {
-			if (!message.length) {
-				return &msg;
-			} else {
-				return searchMessages(msg,message);
-			}
-		}
-	}
-	return null;
-}
-
-PBExtension[]getExtensions(T)(T root) {
-	PBExtension[]ret;
-	ret ~= root.extensions;
-	foreach(msg;root.message_defs) {
-		ret ~= getExtensions(msg);
-	}
-	return ret;
 }
 
 // this is where all files are written, no real processing is done here

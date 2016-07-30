@@ -21,49 +21,6 @@ struct PBChild {
 	bool packed = false;
 	bool is_dep = false;
 
-	string genExtenCode(string indent) {
-		string ret;
-		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~"__exten_"~name~(valdefault.length?" = "~valdefault:"")~";\n";
-		// get accessor
-		ret ~= indent~(is_dep?"deprecated ":"")~toDType(type)~(modifier=="repeated"?"[]":" ")~"GetExtension(int T:"~to!(string)(index)~")() {\n";
-		ret ~= indent~"	return __exten_"~name~";\n";
-		ret ~= indent~"}\n";
-		// set accessor
-		ret ~= indent~(is_dep?"deprecated ":"")~"void SetExtension(int T:"~to!(string)(index)~")("~toDType(type)~(modifier=="repeated"?"[]":" ")~"input_var) {\n";
-		ret ~= indent~"	__exten_"~name~" = input_var;\n";
-		if (modifier != "repeated") ret ~= indent~"	_has__exten_"~name~" = true;\n";
-		ret ~= indent~"}\n";
-		if (modifier == "repeated") {
-			ret ~= indent~(is_dep?"deprecated ":"")~"bool HasExtension(int T:"~to!(string)(index)~")() {\n";
-			ret ~= indent~"	return __exten_"~name~".length?1:0;\n";
-			ret ~= indent~"}\n";
-			ret ~= indent~(is_dep?"deprecated ":"")~"void ClearExtension(int T:"~to!(string)(index)~")() {\n";
-			ret ~= indent~"	__exten_"~name~" = null;\n";
-			ret ~= indent~"}\n";
-			// technically, they can just do class.item.length
-			// there is no need for this
-			ret ~= indent~(is_dep?"deprecated ":"")~"int ExtensionSize(int T:"~to!(string)(index)~")() {\n";
-			ret ~= indent~"	return __exten_"~name~".length;\n";
-			ret ~= indent~"}\n";
-			// functions to do additions, both singular and array
-			ret ~= indent~(is_dep?"deprecated ":"")~"void AddExtension(int T:"~to!(string)(index)~")("~toDType(type)~" __addme) {\n";
-			ret ~= indent~"	__exten_"~name~" ~= __addme;\n";
-			ret ~= indent~"}\n";
-			ret ~= indent~(is_dep?"deprecated ":"")~"void AddExtension(int T:"~to!(string)(index)~")("~toDType(type)~"[]__addme) {\n";
-			ret ~= indent~"	__exten_"~name~" ~= __addme;\n";
-			ret ~= indent~"}\n";
-		} else {
-			ret ~= indent~"bool _has__exten_"~name~" = false;\n";
-			ret ~= indent~(is_dep?"deprecated ":"")~"bool HasExtension(int T:"~to!(string)(index)~")() {\n";
-			ret ~= indent~"	return _has__exten_"~name~";\n";
-			ret ~= indent~"}\n";
-			ret ~= indent~(is_dep?"deprecated ":"")~"void ClearExtension(int T:"~to!(string)(index)~")() {\n";
-			ret ~= indent~"	_has__exten_"~name~" = false;\n";
-			ret ~= indent~"}\n";
-		}
-		return ret;
-	}
-
 	static PBChild opCall(ref ParserData pbstring)
 	in {
 		assert(pbstring.length);
