@@ -43,6 +43,8 @@ private string typeWrapper(PBChild child) {
 		return format("Nullable!(%s) ", toDType(child.type));
 }
 
+private enum extenPrefix = "extension_";
+
 string langD(PBRoot root, bool markMessagesAsStatic = false) {
 	auto code = CodeBuilder(0);
     code.put("import dprotobuf.wireformat;\n");
@@ -140,6 +142,23 @@ unittest {
 	assert(toD(child, 1) == ans);
 }
 
+CodeBuilder genExtenCode(PBChild child, int indentCount) {
+	auto code = CodeBuilder(indentCount);
+	with(child) {
+		auto extName = extenPrefix~name;
+
+		if(is_dep) code.put("deprecated ");
+		else code.put("");
+		code.rawPut(typeWrapper(child));
+		code.rawPut(extName);
+		if(!empty(valdefault)) // Apply default value
+			code.rawPut(" = " ~ valdefault);
+		code.rawPut(";\n");
+
+		return code;
+	}
+}
+
 private string constructMismatchException(string type, int indentCount) {
 	auto code = CodeBuilder(indentCount);
 	code.put("throw new Exception(\"Invalid wiretype \" ~\n");
@@ -203,7 +222,7 @@ string genDes(PBChild child, int indentCount = 0, bool is_exten = false) {
 
       auto tnameCode = CodeBuilder(0);
 		string tname = name;
-		if (is_exten) tname = "__exten"~tname;
+		if (is_exten) tname = extenPrefix~tname;
 		if (is_dep) tname ~= "_dep";
 		if(isReserved(tname)) {
 			tname = tname ~ "_";
@@ -322,7 +341,7 @@ string genSer(PBChild child, int indentCount = 0, bool is_exten = false) {
 			customType = true;
 			break;
 		}
-		auto tname = (is_exten?"__exten":"") ~ name;
+		auto tname = (is_exten?extenPrefix:"") ~ name;
 
 		if(is_dep) tname ~= "_dep";
 		if(isReserved(tname))
@@ -542,7 +561,7 @@ string genDes(PBMessage msg, int indentCount = 0) {
 
 		// check for required fields
 		foreach(pbchild;child_exten) if (pbchild.modifier == "required") {
-			code.put("if (_has__exten_"~pbchild.name~" == false)\n", Indent.open);
+			code.put("if ("~extenPrefix~pbchild.name~".isNull)\n", Indent.open);
 			code.put("throw new Exception(\"Did not find a "~pbchild.name~" in the message parse.\");\n");
 			code.put(Indent.close);
 		}
@@ -644,7 +663,7 @@ string toD(PBMessage msg, int indentCount = 0, bool staticChild = false) {
 		}
 		// last, do the extension instantiations
 		foreach(pbchild;child_exten) {
-			ret ~= pbchild.genExtenCode(indent);
+			ret ~= genExtenCode(pbchild, indentCount).finalize;
 			ret ~= "\n";
 		}
 		ret ~= "\n";
@@ -867,4 +886,24 @@ unittest {
 
 	auto res = ot.Serialize();
 	assert(res == feed);
+}
+
+unittest {
+	enum foo =
+ParserData("message Foo {
+	optional int32 de = 5;
+	extensions 1 to 4;
+}
+extend Foo {
+	optional int32 blah = 1;
+    repeated string da = 2;
+}
+");
+
+	enum root = PBRoot(foo);
+	enum ExtFoo = root.getExtensions();
+
+	mixin(applyExtensions(root, ExtFoo).langD(true));
+    Foo m;
+    m.extension_blah = 5;
 }
