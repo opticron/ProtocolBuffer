@@ -43,7 +43,7 @@ private string typeWrapper(PBChild child) {
 		return format("Nullable!(%s) ", toDType(child.type));
 }
 
-string langD(PBRoot root) {
+string langD(PBRoot root, bool markMessagesAsStatic = false) {
 	auto code = CodeBuilder(0);
     code.put("import dprotobuf.wireformat;\n");
     code.put("import std.conv;\n");
@@ -61,7 +61,7 @@ string langD(PBRoot root) {
     }
     // write out message definitions
     foreach(pbmsg; root.message_defs) {
-        code.put(toD(pbmsg, 0));
+        code.put(toD(pbmsg, 0, markMessagesAsStatic));
     }
     return code.finalize();
 }
@@ -616,13 +616,13 @@ string genMerge(PBMessage msg, int indentCount = 0) {
 
 /**
  */
-string toD(PBMessage msg, int indentCount = 0) {
+string toD(PBMessage msg, int indentCount = 0, bool staticChild = false) {
 	auto indent = indented(indentCount);
 	string ret = "";
 	with(msg) {
 		ret ~= addComments(comments).finalize();
 
-		ret ~= indent~(indent.length?"static ":"")~"struct "~name~" {\n";
+		ret ~= indent~(staticChild?"static ":"")~"struct "~name~" {\n";
 		indent = indented(++indentCount);
 		ret ~= indent~"// deal with unknown fields\n";
 		ret ~= indent~"ubyte[] ufields;\n";
@@ -634,7 +634,7 @@ string toD(PBMessage msg, int indentCount = 0) {
 		}
 		// now, we'll do the nested messages
 		foreach(pbmsg;message_defs) {
-			ret ~= toD(pbmsg, indentCount);
+			ret ~= toD(pbmsg, indentCount, true);
 			ret ~= "\n\n";
 		}
 		// do the individual instantiations
