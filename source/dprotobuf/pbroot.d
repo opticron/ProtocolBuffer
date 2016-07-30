@@ -205,3 +205,93 @@ package myfirstpackage;
 	assert(root.message_defs[0].message_defs[0].name == "PhoneNumber");
 	assert(root.message_defs[0].enum_defs[0].name == "PhoneType");
 }
+
+PBExtension[] getExtensions(T)(T root) {
+	PBExtension[]ret;
+	ret ~= root.extensions;
+	foreach(msg;root.message_defs) {
+		ret ~= getExtensions(msg);
+	}
+	return ret;
+} unittest {
+	enum instr =
+ParserData("extend Foo {
+	optional int blah = 1;
+}
+message Bar {
+	optional int de = 5;
+	extend FooBar {
+		optional string da = 2;
+	}
+}
+");
+
+assert(getExtensions(PBRoot(instr)).map!(x => x.name).equal(["Foo", "FooBar"]));
+}
+
+// this function digs through a given root to see if it has the message
+// described by the dotstring
+PBMessage* searchForMessage(ref PBRoot root, string message) {
+	return searchMessages(root, ParserData(message));
+}
+
+/// Ditto
+PBMessage* searchMessages(T)(ref T root, ParserData message)
+in {
+	assert(message.length);
+} body {
+	string name = stripValidChars(CClass.Identifier,message);
+	if (message.length) {
+		// rip off the leading .
+		message = message[1..message.length];
+	}
+	// this is terminal, so run through the children to find a match
+	foreach(ref msg;root.message_defs) {
+		if (msg.name == name) {
+			if (!message.length) {
+				return &msg;
+			} else {
+				return searchMessages(msg,message);
+			}
+		}
+	}
+	return null;
+} unittest {
+	enum instr =
+ParserData("
+message Foo {
+}
+message Bar {
+	optional int de = 5;
+}
+");
+
+	auto root = PBRoot(instr);
+    assert(searchForMessage(root, "Foo").name == "Foo");
+}
+
+auto applyExtensions(PBRoot root, PBExtension[] exts) {
+	foreach(ext; exts) {
+		auto m = searchForMessage(root, ext.name);
+		if(m) {
+			*m = insertExtension(*m, ext);
+			break;
+		}
+	}
+	return root;
+} static unittest {
+	enum foo =
+ParserData("message Foo {
+	optional int de = 5;
+	extensions 1 to 4;
+}
+extend Foo {
+	optional int blah = 1;
+}
+");
+
+	enum Foo = PBRoot(foo);
+	enum ExtFoo = Foo.getExtensions();
+
+	applyExtensions(Foo, ExtFoo);
+}

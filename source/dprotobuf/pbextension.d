@@ -64,3 +64,45 @@ ParserData("extend Foo {
 	debug writefln("");
 }
 
+import dprotobuf.pbmessage;
+auto insertExtension(PBMessage pbmsg, PBExtension ext) {
+	assert(pbmsg.name == ext.name, "Extensions apply to a specific message; " ~ pbmsg.name ~ " != " ~ ext.name);
+	import std.conv;
+	foreach(echild;ext.children) {
+		bool extmatch = false;
+		foreach(exten;pbmsg.exten_sets) {
+			if (echild.index <= exten.max && echild.index >= exten.min) {
+				extmatch = true;
+				break;
+			}
+		}
+		if (!extmatch) throw new Exception("The field number "~to!(string)(echild.index)~" for extension "~echild.name~" is not within a valid extension range for "~pbmsg.name);
+	}
+
+	// now check each child vs each extension already applied to see if there are conflicts
+	foreach(dchild; pbmsg.child_exten) foreach(echild; ext.children) {
+		if (dchild.index == echild.index) throw new Exception("Extensions "~dchild.name~" and "~echild.name~" to "~pbmsg.name~" have identical index number "~to!(string)(dchild.index));
+	}
+	pbmsg.child_exten ~= ext.children;
+
+	return pbmsg;
+}
+
+unittest {
+	auto foo =
+ParserData("message Foo {
+	optional int de = 5;
+	extensions 1 to 4;
+}
+");
+	auto extFoo =
+ParserData("extend Foo {
+	optional int blah = 1;
+}
+");
+
+	auto Foo = PBMessage(foo);
+	auto ExtFoo = PBExtension(extFoo);
+
+	auto m = insertExtension(Foo, ExtFoo);
+}
